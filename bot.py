@@ -13,7 +13,7 @@ def get_prayer_times(city):
     response = requests.get(url).json()
     if "data" in response:
         timings = response["data"]["timings"]
-        return f"🕌 مواقيت الصلاة في {city}:
+        return f"🕌 مواقيت الصلاة في {city}:\n\n" + "\n".join([f"{key}: {value}" for key, value in timings.items()])
 
 " + "\n".join([f"{key}: {value}" for key, value in timings.items()])
     return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
