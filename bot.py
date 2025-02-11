@@ -1,26 +1,27 @@
-from telegram import Update
-from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
 import requests
 import random
 import sqlite3
 import os
+from telegram import Update
+from telegram.ext import Updater, CommandHandler, CallbackContext, MessageHandler, Filters
 
+# جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
 
 # دالة جلب مواقيت الصلاة بناءً على المدينة
 def get_prayer_times(city):
     url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country=&method=2"
     response = requests.get(url).json()
-    
+
     if "data" in response:
         timings = response["data"]["timings"]
         prayer_times_text = f"🕌 مواقيت الصلاة في {city}:\n\n"
+
         for key, value in timings.items():
             prayer_times_text += f"{key}: {value}\n"
+
         return prayer_times_text
     
-    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
-" + "\n".join([f"{key}: {value}" for key, value in timings.items()])
     return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
 
 # دالة استقبال المدينة وإرسال المواقيت
@@ -45,7 +46,7 @@ def send_faidah(update: Update, context: CallbackContext):
     else:
         update.message.reply_text("❌ لا توجد فوائد متاحة حاليًا.")
 
-# دالة المسابقة
+# دالة المسابقة الإسلامية
 def quiz_command(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -59,13 +60,14 @@ def quiz_command(update: Update, context: CallbackContext):
     else:
         update.message.reply_text("❌ لا توجد أسئلة متاحة حاليًا.")
 
-# دالة التحقق من الإجابة
+# دالة التحقق من إجابة المستخدم
 def check_answer(update: Update, context: CallbackContext):
     user_answer = update.message.text.strip()
     correct_answer = context.user_data.get("answer", "")
 
     if user_answer.lower() == correct_answer.lower():
         update.message.reply_text("✅ إجابة صحيحة! تم تسجيلك في السحب.")
+        
         conn = sqlite3.connect("ramadan_bot.db")
         cursor = conn.cursor()
         cursor.execute("INSERT INTO participants (user_id, username, correct_answers) VALUES (?, ?, ?)",
@@ -86,18 +88,26 @@ def pick_winner(update: Update, context: CallbackContext):
     if winner:
         update.message.reply_text(f"🎉 الفائز لهذا الأسبوع هو: @{winner[0]}! سيتم إرسال الجائزة له.")
     else:
-        update.message.reply_text("❌ لا يوجد مشاركين حتى الآن.")
+        update.message.reply_text("❌ لا يوجد مشاركون حتى الآن.")
 
-# إعداد الأوامر
+# إعداد الأوامر والتشغيل
 def main():
     updater = Updater(TOKEN, use_context=True)
     dp = updater.dispatcher
 
-    dp.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text("🌙 مرحبًا في بوت رمضان! استخدم /prayer لمواقيت الصلاة، /faidah لفوائد إسلامية، و /quiz للمسابقة.")))
+    dp.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
+        "🌙 مرحبًا في بوت رمضان!\n"
+        "🕌 استخدم /prayer لمواقيت الصلاة\n"
+        "💡 استخدم /faidah للحصول على فائدة\n"
+        "❓ استخدم /quiz للمشاركة في المسابقة\n"
+        "🏆 استخدم /winner لاختيار الفائز الأسبوعي"
+    )))
+
     dp.add_handler(CommandHandler("prayer", prayer_command))
     dp.add_handler(CommandHandler("faidah", send_faidah))
     dp.add_handler(CommandHandler("quiz", quiz_command))
     dp.add_handler(CommandHandler("winner", pick_winner))
+
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_city))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, check_answer))
 
