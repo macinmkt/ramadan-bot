@@ -1,3 +1,4 @@
+from telegram.ext import Application, CommandHandler, MessageHandler, filters
 import requests
 import random
 import sqlite3
