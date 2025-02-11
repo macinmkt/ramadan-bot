@@ -92,7 +92,7 @@ def pick_winner(update: Update, context: CallbackContext):
 
 # إعداد الأوامر والتشغيل
 def main():
-    updater = Updater(TOKEN, use_context=True)
+    application = Application.builder().token(TOKEN).build()
     dp = updater.dispatcher
 
     dp.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
@@ -111,7 +111,7 @@ def main():
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, handle_city))
     dp.add_handler(MessageHandler(Filters.text & ~Filters.command, check_answer))
 
-    updater.start_polling()
+    application.run_polling()
     updater.idle()
 
 if __name__ == "__main__":
