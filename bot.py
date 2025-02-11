@@ -11,10 +11,15 @@ TOKEN = os.getenv("TOKEN")
 def get_prayer_times(city):
     url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country=&method=2"
     response = requests.get(url).json()
+    
     if "data" in response:
         timings = response["data"]["timings"]
-        return f"🕌 مواقيت الصلاة في {city}:\n\n" + "\n".join([f"{key}: {value}" for key, value in timings.items()])
-
+        prayer_times_text = f"🕌 مواقيت الصلاة في {city}:\n\n"
+        for key, value in timings.items():
+            prayer_times_text += f"{key}: {value}\n"
+        return prayer_times_text
+    
+    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
 " + "\n".join([f"{key}: {value}" for key, value in timings.items()])
     return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
 
