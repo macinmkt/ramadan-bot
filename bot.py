@@ -1,97 +1,29 @@
-import requests
+import random
 import os
-import sqlite3
 from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+from telegram.ext import Application, CommandHandler, CallbackContext
 
 # جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
 
-# دالة جلب مواقيت الصلاة بناءً على المدينة
-def get_prayer_times(city, country="SA", method=4):
-    url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
-    response = requests.get(url).json()
+# قائمة الفوائد الرمضانية
+ramadan_fawaid = [
+    "📜 **راءُ رَمَضَان:** رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ، وَالضَّادُ: ضَمَانُهُ لِجَزَاءِ الصَّائِمِينَ، وَالأَلْفُ: إِحْسَانُهُ للطَائِعين، والنونُ: نُورُه لِلمُحْسِنِينَ.",
+    "🌙 **يا بُنَيَّ!** إن رَمَضان نِعْمَة للمسلِمين؛ يَجِيْء بالرحمة والمغفرة والعِتق وقايَة للمؤمنين! فقابِله بالاستقامة، ولا تَتَّبع خُطوات الفاسِدين؛ في الخبر: « إذا جاء رمضان، فُتِحَت أبْوابُ الجَنة » للصالِحين « وغُلِّقَت أبواب النار » عن المُستجيبين « وصُفِّدت الشياطين » دون التائبين.",
+    "💡 **فائدة:** الظروف الأرضية هي التي تجعل ليلة القدر متحركة من ليلة لأخرى من ليالي وتر العشر الأخير من رمضان، وأما في السموات فثابتة!",
+    "🌙 **رمضان فرصة عظيمة للتوبة**، فلا تدع أيامه تمر دون أن تغتنمها في القرب من الله، والتخلص من العادات السيئة، وبناء روحك بالإيمان.",
+    "🕌 **في رمضان** يزداد الخير، وتتنزل الرحمات، وتضاعف الحسنات، فلا تفوت لحظة من هذا الشهر دون عمل صالح يقربك إلى الله.",
+    "📖 **الصيام ليس فقط عن الطعام والشراب، بل عن الغيبة والنميمة، وسوء الخلق.** اجعل رمضان نقطة انطلاق لتكون أفضل نسخة من نفسك.",
+    "🤲 **الدعاء في رمضان مستجاب**، فلا تبخل على نفسك بالدعاء، ولا تنس أن ترفع يديك لله في الأوقات المباركة.",
+    "🌠 **ليلة القدر خير من ألف شهر**، فاجتهد في العشر الأواخر، فقد يكون فيها نصيبك من الرحمة والمغفرة والعتق من النار.",
+    "📜 **كان النبي ﷺ أجود الناس، وكان أجود ما يكون في رمضان**. فاجعل رمضان شهر العطاء، وساعد الفقراء والمحتاجين.",
+    "🌟 **قال ﷺ: من صام رمضان إيمانًا واحتسابًا غفر له ما تقدم من ذنبه**. فاجعل صيامك عن قناعة وإخلاص لله.",
+]
 
-    if "data" in response:
-        timings = response["data"]["timings"]
-        hijri_date = response["data"]["date"]["hijri"]["date"]
-        prayer_times_text = f"🕌 مواقيت الصلاة في {city}, {country} - 📆 {hijri_date}:\n\n"
-
-        prayer_order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
-        for prayer in prayer_order:
-            prayer_times_text += f"{prayer}: {timings[prayer]}\n"
-
-        return prayer_times_text
- 
-    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة والدولة."
-    
-    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
-
-# دالة استقبال المدينة وإرسال المواقيت
-async def prayer_command(update: Update, context: CallbackContext):
-    await update.message.reply_text("🔍 أدخل اسم المدينة للحصول على مواقيت الصلاة:")
-
-async def handle_city(update: Update, context: CallbackContext):
-    city = update.message.text.strip()
-    prayer_times = get_prayer_times(city, country="SA", method=4)
-    await update.message.reply_text(prayer_times)
-
-# دالة إرسال فائدة عشوائية من قاعدة البيانات
+# دالة لإرسال فائدة رمضانية عشوائية
 async def send_faidah(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT text FROM faidah ORDER BY RANDOM() LIMIT 1")
-    faidah = cursor.fetchone()
-    conn.close()
-
-    if faidah:
-        await update.message.reply_text(f"💡 {faidah[0]}")
-    else:
-        await update.message.reply_text("❌ لا توجد فوائد متاحة حاليًا.")
-
-# دالة المسابقة الإسلامية
-async def quiz_command(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT question, answer FROM quiz ORDER BY RANDOM() LIMIT 1")
-    question = cursor.fetchone()
-    conn.close()
-
-    if question:
-        context.user_data["answer"] = question[1]
-        await update.message.reply_text(f"❓ {question[0]}")
-    else:
-        await update.message.reply_text("❌ لا توجد أسئلة متاحة حاليًا.")
-
-# دالة التحقق من إجابة المستخدم
-async def check_answer(update: Update, context: CallbackContext):
-    user_answer = update.message.text.strip()
-    correct_answer = context.user_data.get("answer", "")
-
-    if user_answer.lower() == correct_answer.lower():
-        await update.message.reply_text("✅ إجابة صحيحة! تم تسجيلك في السحب.")
-        
-        conn = sqlite3.connect("ramadan_bot.db")
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO participants (user_id, username, correct_answers) VALUES (?, ?, ?)",
-                       (update.message.from_user.id, update.message.from_user.username, 1))
-        conn.commit()
-        conn.close()
-    else:
-        await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
-
-# دالة اختيار الفائز العشوائي
-async def pick_winner(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT username FROM participants ORDER BY RANDOM() LIMIT 1")
-    winner = cursor.fetchone()
-    conn.close()
-
-    if winner:
-        await update.message.reply_text(f"🎉 الفائز لهذا الأسبوع هو: @{winner[0]}! سيتم إرسال الجائزة له.")
-    else:
-        await update.message.reply_text("❌ لا يوجد مشاركون حتى الآن.")
+    faidah = random.choice(ramadan_fawaid)
+    await update.message.reply_text(f"💡 {faidah}")
 
 # إعداد البوت وتشغيله
 def main():
@@ -99,19 +31,10 @@ def main():
 
     app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
         "🌙 مرحبًا في بوت رمضان!\n"
-        "🕌 استخدم /prayer لمواقيت الصلاة\n"
-        "💡 استخدم /faidah للحصول على فائدة\n"
-        "❓ استخدم /quiz للمشاركة في المسابقة\n"
-        "🏆 استخدم /winner لاختيار الفائز الأسبوعي"
+        "💡 استخدم /faidah للحصول على فائدة رمضانية"
     )))
 
-    app.add_handler(CommandHandler("prayer", prayer_command))
     app.add_handler(CommandHandler("faidah", send_faidah))
-    app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(CommandHandler("winner", pick_winner))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_city))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_answer))
 
     app.run_polling()
 
