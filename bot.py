@@ -1,13 +1,16 @@
 import requests
 import os
 import sqlite3
-from telegram import Update
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
 # جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
 
-# دالة جلب مواقيت الصلاة بناءً على المدينة
+# تخزين بيانات المستخدمين
+users_data = {}
+
+# دالة جلب مواقيت الصلاة
 def get_prayer_times(city, country="SA", method=4):
     url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
     response = requests.get(url).json()
@@ -34,7 +37,7 @@ async def handle_city(update: Update, context: CallbackContext):
     prayer_times = get_prayer_times(city, country="SA", method=4)
     await update.message.reply_text(prayer_times)
 
-# دالة إرسال فائدة عشوائية من قاعدة البيانات
+# دالة إرسال فائدة عشوائية
 async def send_faidah(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -47,7 +50,7 @@ async def send_faidah(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا توجد فوائد متاحة حاليًا.")
 
-# دالة المسابقة الإسلامية
+# دالة المسابقة
 async def quiz_command(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -61,7 +64,7 @@ async def quiz_command(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا توجد أسئلة متاحة حاليًا.")
 
-# دالة التحقق من إجابة المستخدم
+# دالة التحقق من الإجابة
 async def check_answer(update: Update, context: CallbackContext):
     user_answer = update.message.text.strip()
     correct_answer = context.user_data.get("answer", "")
@@ -91,25 +94,80 @@ async def pick_winner(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا يوجد مشاركون حتى الآن.")
 
-# إعداد البوت وتشغيله
+# ====== ميزة السبحة الإلكترونية ======
+async def tasbeeh_menu(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    users_data[user_id] = {"count": 0, "goal": None}
+
+    keyboard = [
+        [InlineKeyboardButton("📿 اضف عدد", callback_data='add_count')],
+        [InlineKeyboardButton("🔔 حدد تنبيه", callback_data='set_alert')],
+        [InlineKeyboardButton("🔄 تصفير العداد", callback_data='reset')]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("📿 اختر إعدادات التسبيح:", reply_markup=reply_markup)
+
+async def button(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    if query.data == "add_count":
+        await context.bot.send_message(chat_id=user_id, text="🔢 أدخل عدد التسبيحات:")
+        context.user_data["waiting_for_count"] = True
+
+    elif query.data == "set_alert":
+        await context.bot.send_message(chat_id=user_id, text="🔔 أدخل العدد الذي تريد تلقي تنبيه عنده:")
+        context.user_data["waiting_for_alert"] = True
+
+    elif query.data == "reset":
+        users_data[user_id] = {"count": 0, "goal": None}
+        await query.message.edit_text("🔄 تم تصفير العداد!")
+
+async def handle_tasbeeh_input(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    text = update.message.text.strip()
+
+    if "waiting_for_count" in context.user_data:
+        try:
+            count = int(text)
+            users_data[user_id]["count"] = count
+            del context.user_data["waiting_for_count"]
+            await update.message.reply_text(f"✅ تم ضبط العداد على {count} تسبيحة.")
+        except ValueError:
+            await update.message.reply_text("⚠️ الرجاء إدخال رقم صحيح.")
+
+    elif "waiting_for_alert" in context.user_data:
+        try:
+            goal = int(text)
+            users_data[user_id]["goal"] = goal
+            del context.user_data["waiting_for_alert"]
+            await update.message.reply_text(f"🔔 سيتم تنبيهك عند الوصول إلى {goal} تسبيحة.")
+        except ValueError:
+            await update.message.reply_text("⚠️ الرجاء إدخال رقم صحيح.")
+
+async def tasbeeh(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+
+    if user_id not in users_data:
+        users_data[user_id] = {"count": 0, "goal": None}
+
+    users_data[user_id]["count"] += 1
+    count = users_data[user_id]["count"]
+    goal = users_data[user_id]["goal"]
+
+    if goal and count >= goal:
+        await update.message.reply_text(f"🤲 وصلت إلى {goal} تسبيحة! نسأل الله أن يتقبل منك. 🤲")
+    else:
+        await update.message.reply_text(f"📿 عدد التسبيحات الحالي: {count}")
+
+# تشغيل البوت
 def main():
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
-        "🌙 مرحبًا في بوت رمضان!\n"
-        "🕌 استخدم /prayer لمواقيت الصلاة\n"
-        "💡 استخدم /faidah للحصول على فائدة\n"
-        "❓ استخدم /quiz للمشاركة في المسابقة\n"
-        "🏆 استخدم /winner لاختيار الفائز الأسبوعي"
-    )))
-
-    app.add_handler(CommandHandler("prayer", prayer_command))
-    app.add_handler(CommandHandler("faidah", send_faidah))
-    app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(CommandHandler("winner", pick_winner))
-
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_city))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_answer))
+    app.add_handler(CommandHandler("start", tasbeeh_menu))
+    app.add_handler(CommandHandler("tasbeeh", tasbeeh))
+    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_tasbeeh_input))
+    app.add_handler(CallbackQueryHandler(button))
 
     app.run_polling()
 
