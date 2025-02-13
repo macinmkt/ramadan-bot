@@ -8,17 +8,22 @@ from telegram.ext import Application, CommandHandler, MessageHandler, filters, C
 TOKEN = os.getenv("TOKEN")
 
 # دالة جلب مواقيت الصلاة بناءً على المدينة
-def get_prayer_times(city):
-    url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country=&method=2"
+def get_prayer_times(city, country="SA", method=4):
+    url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
     response = requests.get(url).json()
 
     if "data" in response:
         timings = response["data"]["timings"]
-        prayer_times_text = f"🕌 مواقيت الصلاة في {city}:\n\n"
-        for key, value in timings.items():
-            prayer_times_text += f"{key}: {value}\n"
+        hijri_date = response["data"]["date"]["hijri"]["date"]
+        prayer_times_text = f"🕌 مواقيت الصلاة في {city}, {country} - 📆 {hijri_date}:\n\n"
+
+        prayer_order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
+        for prayer in prayer_order:
+            prayer_times_text += f"{prayer}: {timings[prayer]}\n"
 
         return prayer_times_text
+ 
+    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة والدولة."
     
     return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
 
