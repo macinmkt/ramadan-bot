@@ -1,3 +1,4 @@
+from telegram.ext import CallbackQueryHandler
 import requests
 import os
 import sqlite3
