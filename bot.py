@@ -33,7 +33,7 @@ async def prayer_command(update: Update, context: CallbackContext):
 
 async def handle_city(update: Update, context: CallbackContext):
     city = update.message.text.strip()
-    prayer_times = get_prayer_times(city)
+    prayer_times = get_prayer_times(city, country="SA", method=4)
     await update.message.reply_text(prayer_times)
 
 # دالة إرسال فائدة عشوائية من قاعدة البيانات
