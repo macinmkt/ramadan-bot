@@ -17,7 +17,8 @@ cursor.execute("""
         user_id INTEGER PRIMARY KEY,
         daily_count INTEGER DEFAULT 1,
         selected_day INTEGER,
-        saved_words TEXT
+        saved_words TEXT,
+        reviewed_days TEXT
     )
 """)
 conn.commit()
@@ -48,7 +49,7 @@ async def start_saving(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.edit_text("📝 اختر عدد الكلمات اليومية:", reply_markup=reply_markup)
 
-# 📌 عرض تقويم رمضان لاختيار اليوم بشكل جميل
+# 📌 عرض تقويم رمضان لاختيار اليوم بشكل جميل مع علامة ✔️ على الأيام التي تمت مراجعتها
 async def select_day(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -57,12 +58,16 @@ async def select_day(update: Update, context: CallbackContext):
     # تحديث عدد الكلمات في قاعدة البيانات
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, selected_day, saved_words) VALUES (?, ?, ?, ?)",
-                   (user_id, count, None, ""))
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, selected_day, saved_words, reviewed_days) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, count, None, "", ""))
     conn.commit()
-    conn.close()
 
-    # إعداد تقويم رمضان بشكل مرتب
+    # استرجاع الأيام التي تمت مراجعتها
+    cursor.execute("SELECT reviewed_days FROM users WHERE user_id=?", (user_id,))
+    reviewed_days = cursor.fetchone()[0]
+    reviewed_days = reviewed_days.split(",") if reviewed_days else []
+
+    # إعداد تقويم رمضان بشكل مرتب مع علامة ✔️ على الأيام التي تمت مراجعتها
     keyboard = []
     year = datetime.now().year
     month = 3  # رمضان غالبًا في مارس أو أبريل
@@ -70,7 +75,8 @@ async def select_day(update: Update, context: CallbackContext):
 
     row = []
     for day in range(1, days_in_month + 1):
-        row.append(InlineKeyboardButton(f"{day}", callback_data=f"day_{day}"))
+        mark = "✔️" if str(day) in reviewed_days else ""
+        row.append(InlineKeyboardButton(f"{day} {mark}", callback_data=f"day_{day}"))
         if len(row) == 7:  # كل 7 أيام في صف واحد
             keyboard.append(row)
             row = []
@@ -107,16 +113,33 @@ async def show_words(update: Update, context: CallbackContext):
     conn.close()
 
     keyboard = [
-        [InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")],
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"reviewed_{day}")],
         [InlineKeyboardButton("🔙 الرجوع للخلف", callback_data="select_day")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.edit_text(f"📖 *كلمات يوم {day} من رمضان:*\n{', '.join(selected_words)}", reply_markup=reply_markup)
 
-# 📌 تأكيد الحفظ
-async def confirm_saved(update: Update, context: CallbackContext):
+# 📌 تأكيد الحفظ وإضافة علامة ✔️ على اليوم الذي تمت مراجعته
+async def confirm_reviewed(update: Update, context: CallbackContext):
     query = update.callback_query
-    await query.message.edit_text("✅ تم تسجيل حفظك بنجاح!")
+    user_id = query.from_user.id
+    day = query.data.split("_")[1]
+
+    # تحديث الأيام التي تمت مراجعتها
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT reviewed_days FROM users WHERE user_id=?", (user_id,))
+    reviewed_days = cursor.fetchone()[0]
+
+    reviewed_days = reviewed_days.split(",") if reviewed_days else []
+    if day not in reviewed_days:
+        reviewed_days.append(day)
+
+    cursor.execute("UPDATE users SET reviewed_days = ? WHERE user_id=?", (",".join(reviewed_days), user_id))
+    conn.commit()
+    conn.close()
+
+    await query.message.edit_text("✅ تم تسجيل مراجعة اليوم بنجاح!")
 
 # 📌 تذكير بكلمات اليوم السابق
 async def remind_previous(update: Update, context: CallbackContext):
@@ -148,7 +171,7 @@ def main():
     app.add_handler(CallbackQueryHandler(start_saving, pattern="start_saving"))
     app.add_handler(CallbackQueryHandler(select_day, pattern="count_\\d+"))
     app.add_handler(CallbackQueryHandler(show_words, pattern="day_\\d+"))
-    app.add_handler(CallbackQueryHandler(confirm_saved, pattern="saved"))
+    app.add_handler(CallbackQueryHandler(confirm_reviewed, pattern="reviewed_\\d+"))
     app.add_handler(CallbackQueryHandler(remind_previous, pattern="remind_previous"))
     app.add_handler(CallbackQueryHandler(restart, pattern="restart"))
     app.add_handler(CallbackQueryHandler(main_menu, pattern="main_menu"))
@@ -156,4 +179,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    main() 
+    main()
