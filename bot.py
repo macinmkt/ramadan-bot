@@ -1,40 +1,145 @@
-import random
 import os
-from telegram import Update
-from telegram.ext import Application, CommandHandler, CallbackContext
+import random
+import sqlite3
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
 
-# جلب توكن البوت من المتغيرات البيئية
+# 🔴 ضع توكن البوت الخاص بك هنا
 TOKEN = os.getenv("TOKEN")
 
-# قائمة الفوائد الرمضانية
-ramadan_fawaid = [
-    "📜 **راءُ رَمَضَان:** رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ، وَالضَّادُ: ضَمَانُهُ لِجَزَاءِ الصَّائِمِينَ، وَالأَلْفُ: إِحْسَانُهُ للطَائِعين، والنونُ: نُورُه لِلمُحْسِنِينَ.",
-    "🌙 **يا بُنَيَّ!** إن رَمَضان نِعْمَة للمسلِمين؛ يَجِيْء بالرحمة والمغفرة والعِتق وقايَة للمؤمنين! فقابِله بالاستقامة، ولا تَتَّبع خُطوات الفاسِدين؛ في الخبر: « إذا جاء رمضان، فُتِحَت أبْوابُ الجَنة » للصالِحين « وغُلِّقَت أبواب النار » عن المُستجيبين « وصُفِّدت الشياطين » دون التائبين.",
-    "💡 **فائدة:** الظروف الأرضية هي التي تجعل ليلة القدر متحركة من ليلة لأخرى من ليالي وتر العشر الأخير من رمضان، وأما في السموات فثابتة!",
-    "🌙 **رمضان فرصة عظيمة للتوبة**، فلا تدع أيامه تمر دون أن تغتنمها في القرب من الله، والتخلص من العادات السيئة، وبناء روحك بالإيمان.",
-    "🕌 **في رمضان** يزداد الخير، وتتنزل الرحمات، وتضاعف الحسنات، فلا تفوت لحظة من هذا الشهر دون عمل صالح يقربك إلى الله.",
-    "📖 **الصيام ليس فقط عن الطعام والشراب، بل عن الغيبة والنميمة، وسوء الخلق.** اجعل رمضان نقطة انطلاق لتكون أفضل نسخة من نفسك.",
-    "🤲 **الدعاء في رمضان مستجاب**، فلا تبخل على نفسك بالدعاء، ولا تنس أن ترفع يديك لله في الأوقات المباركة.",
-    "🌠 **ليلة القدر خير من ألف شهر**، فاجتهد في العشر الأواخر، فقد يكون فيها نصيبك من الرحمة والمغفرة والعتق من النار.",
-    "📜 **كان النبي ﷺ أجود الناس، وكان أجود ما يكون في رمضان**. فاجعل رمضان شهر العطاء، وساعد الفقراء والمحتاجين.",
-    "🌟 **قال ﷺ: من صام رمضان إيمانًا واحتسابًا غفر له ما تقدم من ذنبه**. فاجعل صيامك عن قناعة وإخلاص لله.",
+# 📌 قائمة التغريدات الرمضانية المحفوظة
+tweets_list = [
+    "📜 **راءُ رَمَضَان:** رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ...",
+    "🌙 **يا بُنَيَّ!** إن رَمَضان نِعْمَة للمسلِمين؛ يَجِيْء بالرحمة والمغفرة والعِتق...",
+    "💡 **فائدة:** الظروف الأرضية تجعل ليلة القدر متحركة، وأما في السموات فثابتة!",
+    "📌 **قال ﷺ:** الصيام جُنَّة، فإذا كان يوم صوم أحدكم فلا يرفث ولا يصخب...",
+    "🌠 **ليلة القدر خير من ألف شهر، فاجتهد في العشر الأواخر بالصلاة والدعاء**."
 ]
 
-# دالة لإرسال فائدة رمضانية عشوائية
-async def send_faidah(update: Update, context: CallbackContext):
-    faidah = random.choice(ramadan_fawaid)
-    await update.message.reply_text(f"💡 {faidah}")
+# 🛠️ تهيئة قاعدة البيانات لحفظ تقدم المستخدمين
+conn = sqlite3.connect("ramadan_bot.db")
+cursor = conn.cursor()
+cursor.execute("""
+    CREATE TABLE IF NOT EXISTS users (
+        user_id INTEGER PRIMARY KEY,
+        daily_count INTEGER DEFAULT 1,
+        saved_tweets TEXT
+    )
+""")
+conn.commit()
+conn.close()
 
-# إعداد البوت وتشغيله
+# 📌 دالة اختيار عدد التغريدات اليومية
+async def set_tweets(update: Update, context: CallbackContext):
+    keyboard = [
+        [InlineKeyboardButton("📌 1 تغريدة", callback_data="1"),
+         InlineKeyboardButton("📌 5 تغريدات", callback_data="5"),
+         InlineKeyboardButton("📌 10 تغريدات", callback_data="10")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.message.reply_text("📝 اختر عدد التغريدات اليومية التي ترغب في حفظها:", reply_markup=reply_markup)
+
+async def save_choice(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    daily_count = int(query.data)
+
+    # حفظ عدد التغريدات في قاعدة البيانات
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, saved_tweets) VALUES (?, ?, ?)",
+                   (user_id, daily_count, ""))
+    conn.commit()
+    conn.close()
+
+    await query.message.reply_text(f"✅ تم تحديد {daily_count} تغريدة يوميًا لحفظها!")
+
+# 📌 إرسال التغريدات اليومية
+async def send_tweets(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT daily_count FROM users WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    if result:
+        daily_count = result[0]
+    else:
+        daily_count = 1  # إذا لم يحدد المستخدم عدد التغريدات، يتم تحديد 1 تلقائيًا
+
+    selected_tweets = random.sample(tweets_list, min(daily_count, len(tweets_list)))
+    tweet_text = "\n\n".join(selected_tweets)
+
+    keyboard = [[InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    await update.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
+
+async def confirm_saved(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+
+    # حفظ أن المستخدم أكمل الحفظ
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    saved_tweets = result[0] if result else ""
+
+    cursor.execute("UPDATE users SET saved_tweets = ? WHERE user_id=?", (saved_tweets + "\n" + "✅ تم الحفظ", user_id))
+    conn.commit()
+    conn.close()
+
+    await query.message.reply_text("🎯 أحسنت! تم تسجيل حفظك للتغريدات.")
+
+# 📌 مراجعة التغريدات المحفوظة
+async def review_tweets(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    if result and result[0]:
+        await update.message.reply_text(f"📖 **تغريداتك المحفوظة:**\n{result[0]}")
+    else:
+        await update.message.reply_text("❌ لا يوجد لديك تغريدات محفوظة بعد. استخدم /tweets_today لحفظ تغريدات جديدة!")
+
+# 📌 الاختبار النهائي
+async def final_test(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+
+    conn = sqlite3.connect("ramadan_bot.db")
+    cursor = conn.cursor()
+    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
+    result = cursor.fetchone()
+    conn.close()
+
+    if result and result[0]:
+        await update.message.reply_text("🎓 **الاختبار النهائي:**\nأعد كتابة التغريدات التي حفظتها بدون النظر إليها!")
+    else:
+        await update.message.reply_text("❌ لا يوجد لديك تغريدات محفوظة بعد!")
+
+# 📌 إصدار الشهادة الإلكترونية
+async def certificate(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    await update.message.reply_text(f"🎉 مبارك! لقد أكملت الحفظ بنجاح.\n🎓 **شهادة حفظ التغريدات الرمضانية** للمستخدم @{update.message.from_user.username}.")
+
+# 🏗️ إعداد البوت
 def main():
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
-        "🌙 مرحبًا في بوت رمضان!\n"
-        "💡 استخدم /faidah للحصول على فائدة رمضانية"
-    )))
-
-    app.add_handler(CommandHandler("faidah", send_faidah))
+    app.add_handler(CommandHandler("start", set_tweets))
+    app.add_handler(CommandHandler("tweets_today", send_tweets))
+    app.add_handler(CommandHandler("review", review_tweets))
+    app.add_handler(CommandHandler("final_test", final_test))
+    app.add_handler(CommandHandler("certificate", certificate))
+    app.add_handler(CallbackQueryHandler(save_choice, pattern="^\\d+$"))
+    app.add_handler(CallbackQueryHandler(confirm_saved, pattern="saved"))
 
     app.run_polling()
 
