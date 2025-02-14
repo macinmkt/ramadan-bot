@@ -54,9 +54,13 @@ async def save_choice(update: Update, context: CallbackContext):
 
     await query.message.reply_text(f"✅ تم تحديد {daily_count} تغريدة يوميًا لحفظها!")
 
-# 📌 إرسال التغريدات اليومية
-async def send_tweets(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+    # ⬅️ إرسال التغريدات فورًا بعد الاختيار
+    await send_tweets(query, context, user_id)
+
+# 📌 إرسال التغريدات اليومية مباشرة بعد تحديد العدد
+async def send_tweets(update_or_query, context: CallbackContext, user_id=None):
+    if user_id is None:  # إذا كان الاستدعاء من أمر وليس من الاختيار
+        user_id = update_or_query.message.from_user.id
 
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -75,7 +79,10 @@ async def send_tweets(update: Update, context: CallbackContext):
     keyboard = [[InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
-    await update.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
+    if isinstance(update_or_query, Update):
+        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
+    else:  # إذا كان استدعاء من CallbackQuery
+        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
 
 async def confirm_saved(update: Update, context: CallbackContext):
     query = update.callback_query
