@@ -1,157 +1,150 @@
 import os
 import random
 import sqlite3
+import calendar
+from datetime import datetime, timedelta
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
-import asyncio
 
 # 🔴 ضع توكن البوت الخاص بك هنا
 TOKEN = os.getenv("TOKEN")
 
-# 📌 قائمة التغريدات الرمضانية المحفوظة
-tweets_list = [
-    "📜 **راءُ رَمَضَان:** رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ...",
-    "🌙 **يا بُنَيَّ!** إن رَمَضان نِعْمَة للمسلِمين؛ يَجِيْء بالرحمة والمغفرة والعِتق...",
-    "💡 **فائدة:** الظروف الأرضية تجعل ليلة القدر متحركة، وأما في السموات فثابتة!",
-    "📌 **قال ﷺ:** الصيام جُنَّة، فإذا كان يوم صوم أحدكم فلا يرفث ولا يصخب...",
-    "🌠 **ليلة القدر خير من ألف شهر، فاجتهد في العشر الأواخر بالصلاة والدعاء**."
-]
-
-# 🛠️ تهيئة قاعدة البيانات لحفظ تقدم المستخدمين
+# 🛠️ قاعدة البيانات لحفظ تقدم المستخدمين
 conn = sqlite3.connect("ramadan_bot.db")
 cursor = conn.cursor()
 cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         daily_count INTEGER DEFAULT 1,
-        saved_tweets TEXT,
-        receive_daily BOOLEAN DEFAULT 0
+        selected_day INTEGER,
+        saved_words TEXT,
+        last_reminder TEXT
     )
 """)
 conn.commit()
 conn.close()
 
+# 📌 الكلمات العلية للحفظ
+words_list = ["إخلاص", "تقوى", "عبادة", "صبر", "إحسان", "توبة", "خشوع", "رحمة", "مغفرة", "يقين"]
+
 # 📌 القائمة الرئيسية
 async def main_menu(update: Update, context: CallbackContext):
     keyboard = [
-        [InlineKeyboardButton("📌 اختر عدد التغريدات اليومية", callback_data="set_tweets")],
-        [InlineKeyboardButton("📅 أرسل لي كلمة رمضانية يوميًا", callback_data="daily_ramadan")],
-        [InlineKeyboardButton("📖 مراجعة التغريدات المحفوظة", callback_data="review_tweets")],
-        [InlineKeyboardButton("🎓 الاختبار النهائي", callback_data="final_test")],
-        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
+        [InlineKeyboardButton("📖 برنامج حفظ الكلمات العلية", callback_data="start_saving")],
+        [InlineKeyboardButton("📅 ذكرني بكلمات اليوم السابق", callback_data="remind_previous")],
+        [InlineKeyboardButton("🔙 الرجوع للبداية", callback_data="restart")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("📌 *اختر من القائمة الرئيسية:*", reply_markup=reply_markup, parse_mode="Markdown")
 
-# 📌 اختيار عدد التغريدات اليومية
-async def set_tweets(update: Update, context: CallbackContext):
+# 📌 اختيار عدد الكلمات اليومية
+async def start_saving(update: Update, context: CallbackContext):
     query = update.callback_query
     keyboard = [
-        [InlineKeyboardButton("📌 1 تغريدة", callback_data="tweets_1"),
-         InlineKeyboardButton("📌 5 تغريدات", callback_data="tweets_5"),
-         InlineKeyboardButton("📌 10 تغريدات", callback_data="tweets_10")],
-        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
+        [InlineKeyboardButton("📌 كلمة واحدة", callback_data="count_1")],
+        [InlineKeyboardButton("📌 كلمتين", callback_data="count_2")],
+        [InlineKeyboardButton("📌 ثلاث كلمات", callback_data="count_3")],
+        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="restart")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.message.edit_text("📝 اختر عدد التغريدات اليومية:", reply_markup=reply_markup)
+    await query.message.edit_text("📝 اختر عدد الكلمات اليومية:", reply_markup=reply_markup)
 
-# 📌 حفظ اختيار المستخدم وإرسال التغريدات
-async def save_choice(update: Update, context: CallbackContext):
+# 📌 عرض تقويم رمضان لاختيار اليوم
+async def select_day(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
-    daily_count = int(query.data.split("_")[1])
+    count = int(query.data.split("_")[1])
 
+    # تحديث عدد الكلمات في قاعدة البيانات
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, saved_tweets, receive_daily) VALUES (?, ?, ?, ?)",
-                   (user_id, daily_count, "", 1))
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, selected_day, saved_words, last_reminder) VALUES (?, ?, ?, ?, ?)",
+                   (user_id, count, None, "", ""))
     conn.commit()
     conn.close()
 
-    await query.message.reply_text(f"✅ تم تحديد {daily_count} تغريدة يوميًا لحفظها!")
+    # عرض تقويم رمضان
+    keyboard = []
+    year = datetime.now().year
+    month = 3  # رمضان يكون في مارس أو أبريل حسب السنة
+    days_in_month = calendar.monthrange(year, month)[1]
 
-    # ⬅️ إرسال التغريدات فورًا بعد الاختيار
-    await send_tweets(query, context, user_id)
+    for i in range(1, days_in_month + 1):
+        keyboard.append([InlineKeyboardButton(f"📅 يوم {i}", callback_data=f"day_{i}")])
 
-# 📌 إرسال التغريدات اليومية
-async def send_tweets(update_or_query, context: CallbackContext, user_id=None):
-    if user_id is None:
-        user_id = update_or_query.message.from_user.id
+    keyboard.append([InlineKeyboardButton("🔙 الرجوع للخلف", callback_data="start_saving")])
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.edit_text("📆 اختر يومًا من رمضان:", reply_markup=reply_markup)
 
+# 📌 عرض الكلمات المختارة للحفظ بعد اختيار اليوم
+async def show_words(update: Update, context: CallbackContext):
+    query = update.callback_query
+    user_id = query.from_user.id
+    day = int(query.data.split("_")[1])
+
+    # جلب عدد الكلمات المحفوظة للمستخدم
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
     cursor.execute("SELECT daily_count FROM users WHERE user_id=?", (user_id,))
     result = cursor.fetchone()
     conn.close()
 
-    daily_count = result[0] if result else 1  # الافتراضي 1 تغريدة يوميًا
-    selected_tweets = random.sample(tweets_list, min(daily_count, len(tweets_list)))
-    tweet_text = "\n\n".join(selected_tweets)
+    daily_count = result[0] if result else 1
+    selected_words = random.sample(words_list, min(daily_count, len(words_list)))
 
-    keyboard = [
-        [InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")],
-        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-
-    if isinstance(update_or_query, Update):
-        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم:**\n\n{tweet_text}", reply_markup=reply_markup)
-    else:
-        await update_or_query.message.edit_text(f"🌙 **تغريدات اليوم:**\n\n{tweet_text}", reply_markup=reply_markup)
-
-# 📌 تذكير يومي بالكلمات الرمضانية
-async def daily_ramadan(update: Update, context: CallbackContext):
-    query = update.callback_query
-    user_id = query.from_user.id
-
+    # حفظ اليوم والكلمات المختارة
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("UPDATE users SET receive_daily = 1 WHERE user_id=?", (user_id,))
+    cursor.execute("UPDATE users SET selected_day = ?, saved_words = ? WHERE user_id=?", 
+                   (day, ",".join(selected_words), user_id))
     conn.commit()
     conn.close()
 
-    await query.message.reply_text("✅ سيتم إرسال كلمة رمضانية يوميًا لك!")
+    keyboard = [
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")],
+        [InlineKeyboardButton("🔙 الرجوع للخلف", callback_data="select_day")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.edit_text(f"📖 *كلمات يوم {day} من رمضان:*\n{', '.join(selected_words)}", reply_markup=reply_markup)
 
-# 📌 مراجعة التغريدات المحفوظة
-async def review_tweets(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+# 📌 تأكيد الحفظ
+async def confirm_saved(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.message.edit_text("✅ تم تسجيل حفظك بنجاح!")
 
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
-    result = cursor.fetchone()
-    conn.close()
-
-    if result and result[0]:
-        await update.message.reply_text(f"📖 **تغريداتك المحفوظة:**\n{result[0]}")
-    else:
-        await update.message.reply_text("❌ لا يوجد لديك تغريدات محفوظة بعد. استخدم /tweets_today لحفظ تغريدات جديدة!")
-
-# 📌 الاختبار النهائي
-async def final_test(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+# 📌 تذكير بكلمات اليوم السابق
+async def remind_previous(update: Update, context: CallbackContext):
+    user_id = update.callback_query.from_user.id
 
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
+    cursor.execute("SELECT selected_day, saved_words FROM users WHERE user_id=?", (user_id,))
     result = cursor.fetchone()
     conn.close()
 
-    if result and result[0]:
-        await update.message.reply_text("🎓 **الاختبار النهائي:**\nأعد كتابة التغريدات التي حفظتها بدون النظر إليها!")
+    if result and result[0] and result[1]:
+        previous_day = result[0] - 1
+        words = result[1]
+
+        await update.callback_query.message.edit_text(f"🔄 *تذكير بكلمات يوم {previous_day}:*\n{words}")
     else:
-        await update.message.reply_text("❌ لا يوجد لديك تغريدات محفوظة بعد!")
+        await update.callback_query.message.edit_text("❌ لا يوجد لديك كلمات محفوظة من اليوم السابق.")
+
+# 📌 إعادة تشغيل البوت والعودة للبداية
+async def restart(update: Update, context: CallbackContext):
+    await main_menu(update, context)
 
 # 📌 إعداد البوت
 def main():
     app = Application.builder().token(TOKEN).build()
 
     app.add_handler(CommandHandler("start", main_menu))
-    app.add_handler(CallbackQueryHandler(set_tweets, pattern="set_tweets"))
-    app.add_handler(CallbackQueryHandler(save_choice, pattern="tweets_\\d+"))
-    app.add_handler(CallbackQueryHandler(daily_ramadan, pattern="daily_ramadan"))
-    app.add_handler(CallbackQueryHandler(review_tweets, pattern="review_tweets"))
-    app.add_handler(CallbackQueryHandler(final_test, pattern="final_test"))
+    app.add_handler(CallbackQueryHandler(start_saving, pattern="start_saving"))
+    app.add_handler(CallbackQueryHandler(select_day, pattern="count_\\d+"))
+    app.add_handler(CallbackQueryHandler(show_words, pattern="day_\\d+"))
+    app.add_handler(CallbackQueryHandler(confirm_saved, pattern="saved"))
+    app.add_handler(CallbackQueryHandler(remind_previous, pattern="remind_previous"))
+    app.add_handler(CallbackQueryHandler(restart, pattern="restart"))
     app.add_handler(CallbackQueryHandler(main_menu, pattern="main_menu"))
 
     app.run_polling()
