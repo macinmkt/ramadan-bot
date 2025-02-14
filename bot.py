@@ -3,6 +3,7 @@ import random
 import sqlite3
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
+import asyncio
 
 # 🔴 ضع توكن البوت الخاص بك هنا
 TOKEN = os.getenv("TOKEN")
@@ -23,32 +24,47 @@ cursor.execute("""
     CREATE TABLE IF NOT EXISTS users (
         user_id INTEGER PRIMARY KEY,
         daily_count INTEGER DEFAULT 1,
-        saved_tweets TEXT
+        saved_tweets TEXT,
+        receive_daily BOOLEAN DEFAULT 0
     )
 """)
 conn.commit()
 conn.close()
 
-# 📌 دالة اختيار عدد التغريدات اليومية
-async def set_tweets(update: Update, context: CallbackContext):
+# 📌 القائمة الرئيسية
+async def main_menu(update: Update, context: CallbackContext):
     keyboard = [
-        [InlineKeyboardButton("📌 1 تغريدة", callback_data="1"),
-         InlineKeyboardButton("📌 5 تغريدات", callback_data="5"),
-         InlineKeyboardButton("📌 10 تغريدات", callback_data="10")]
+        [InlineKeyboardButton("📌 اختر عدد التغريدات اليومية", callback_data="set_tweets")],
+        [InlineKeyboardButton("📅 أرسل لي كلمة رمضانية يوميًا", callback_data="daily_ramadan")],
+        [InlineKeyboardButton("📖 مراجعة التغريدات المحفوظة", callback_data="review_tweets")],
+        [InlineKeyboardButton("🎓 الاختبار النهائي", callback_data="final_test")],
+        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("📝 اختر عدد التغريدات اليومية التي ترغب في حفظها:", reply_markup=reply_markup)
+    await update.message.reply_text("📌 *اختر من القائمة الرئيسية:*", reply_markup=reply_markup, parse_mode="Markdown")
 
+# 📌 اختيار عدد التغريدات اليومية
+async def set_tweets(update: Update, context: CallbackContext):
+    query = update.callback_query
+    keyboard = [
+        [InlineKeyboardButton("📌 1 تغريدة", callback_data="tweets_1"),
+         InlineKeyboardButton("📌 5 تغريدات", callback_data="tweets_5"),
+         InlineKeyboardButton("📌 10 تغريدات", callback_data="tweets_10")],
+        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await query.message.edit_text("📝 اختر عدد التغريدات اليومية:", reply_markup=reply_markup)
+
+# 📌 حفظ اختيار المستخدم وإرسال التغريدات
 async def save_choice(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
-    daily_count = int(query.data)
+    daily_count = int(query.data.split("_")[1])
 
-    # حفظ عدد التغريدات في قاعدة البيانات
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, saved_tweets) VALUES (?, ?, ?)",
-                   (user_id, daily_count, ""))
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, saved_tweets, receive_daily) VALUES (?, ?, ?, ?)",
+                   (user_id, daily_count, "", 1))
     conn.commit()
     conn.close()
 
@@ -57,9 +73,9 @@ async def save_choice(update: Update, context: CallbackContext):
     # ⬅️ إرسال التغريدات فورًا بعد الاختيار
     await send_tweets(query, context, user_id)
 
-# 📌 إرسال التغريدات اليومية مباشرة بعد تحديد العدد
+# 📌 إرسال التغريدات اليومية
 async def send_tweets(update_or_query, context: CallbackContext, user_id=None):
-    if user_id is None:  # إذا كان الاستدعاء من أمر وليس من الاختيار
+    if user_id is None:
         user_id = update_or_query.message.from_user.id
 
     conn = sqlite3.connect("ramadan_bot.db")
@@ -68,38 +84,33 @@ async def send_tweets(update_or_query, context: CallbackContext, user_id=None):
     result = cursor.fetchone()
     conn.close()
 
-    if result:
-        daily_count = result[0]
-    else:
-        daily_count = 1  # إذا لم يحدد المستخدم عدد التغريدات، يتم تحديد 1 تلقائيًا
-
+    daily_count = result[0] if result else 1  # الافتراضي 1 تغريدة يوميًا
     selected_tweets = random.sample(tweets_list, min(daily_count, len(tweets_list)))
     tweet_text = "\n\n".join(selected_tweets)
 
-    keyboard = [[InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")]]
+    keyboard = [
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data="saved")],
+        [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="main_menu")]
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if isinstance(update_or_query, Update):
-        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
-    else:  # إذا كان استدعاء من CallbackQuery
-        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم لحفظها:**\n\n{tweet_text}", reply_markup=reply_markup)
+        await update_or_query.message.reply_text(f"🌙 **تغريدات اليوم:**\n\n{tweet_text}", reply_markup=reply_markup)
+    else:
+        await update_or_query.message.edit_text(f"🌙 **تغريدات اليوم:**\n\n{tweet_text}", reply_markup=reply_markup)
 
-async def confirm_saved(update: Update, context: CallbackContext):
+# 📌 تذكير يومي بالكلمات الرمضانية
+async def daily_ramadan(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
 
-    # حفظ أن المستخدم أكمل الحفظ
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("SELECT saved_tweets FROM users WHERE user_id=?", (user_id,))
-    result = cursor.fetchone()
-    saved_tweets = result[0] if result else ""
-
-    cursor.execute("UPDATE users SET saved_tweets = ? WHERE user_id=?", (saved_tweets + "\n" + "✅ تم الحفظ", user_id))
+    cursor.execute("UPDATE users SET receive_daily = 1 WHERE user_id=?", (user_id,))
     conn.commit()
     conn.close()
 
-    await query.message.reply_text("🎯 أحسنت! تم تسجيل حفظك للتغريدات.")
+    await query.message.reply_text("✅ سيتم إرسال كلمة رمضانية يوميًا لك!")
 
 # 📌 مراجعة التغريدات المحفوظة
 async def review_tweets(update: Update, context: CallbackContext):
@@ -131,22 +142,17 @@ async def final_test(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا يوجد لديك تغريدات محفوظة بعد!")
 
-# 📌 إصدار الشهادة الإلكترونية
-async def certificate(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    await update.message.reply_text(f"🎉 مبارك! لقد أكملت الحفظ بنجاح.\n🎓 **شهادة حفظ التغريدات الرمضانية** للمستخدم @{update.message.from_user.username}.")
-
-# 🏗️ إعداد البوت
+# 📌 إعداد البوت
 def main():
     app = Application.builder().token(TOKEN).build()
 
-    app.add_handler(CommandHandler("start", set_tweets))
-    app.add_handler(CommandHandler("tweets_today", send_tweets))
-    app.add_handler(CommandHandler("review", review_tweets))
-    app.add_handler(CommandHandler("final_test", final_test))
-    app.add_handler(CommandHandler("certificate", certificate))
-    app.add_handler(CallbackQueryHandler(save_choice, pattern="^\\d+$"))
-    app.add_handler(CallbackQueryHandler(confirm_saved, pattern="saved"))
+    app.add_handler(CommandHandler("start", main_menu))
+    app.add_handler(CallbackQueryHandler(set_tweets, pattern="set_tweets"))
+    app.add_handler(CallbackQueryHandler(save_choice, pattern="tweets_\\d+"))
+    app.add_handler(CallbackQueryHandler(daily_ramadan, pattern="daily_ramadan"))
+    app.add_handler(CallbackQueryHandler(review_tweets, pattern="review_tweets"))
+    app.add_handler(CallbackQueryHandler(final_test, pattern="final_test"))
+    app.add_handler(CallbackQueryHandler(main_menu, pattern="main_menu"))
 
     app.run_polling()
 
