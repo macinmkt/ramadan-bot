@@ -2,7 +2,7 @@ import os
 import random
 import sqlite3
 import calendar
-from datetime import datetime, timedelta
+from datetime import datetime
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
 
@@ -17,8 +17,7 @@ cursor.execute("""
         user_id INTEGER PRIMARY KEY,
         daily_count INTEGER DEFAULT 1,
         selected_day INTEGER,
-        saved_words TEXT,
-        last_reminder TEXT
+        saved_words TEXT
     )
 """)
 conn.commit()
@@ -41,15 +40,15 @@ async def main_menu(update: Update, context: CallbackContext):
 async def start_saving(update: Update, context: CallbackContext):
     query = update.callback_query
     keyboard = [
-        [InlineKeyboardButton("📌 كلمة واحدة", callback_data="count_1")],
-        [InlineKeyboardButton("📌 كلمتين", callback_data="count_2")],
-        [InlineKeyboardButton("📌 ثلاث كلمات", callback_data="count_3")],
+        [InlineKeyboardButton("📌 كلمة واحدة", callback_data="count_1"),
+         InlineKeyboardButton("📌 كلمتين", callback_data="count_2"),
+         InlineKeyboardButton("📌 ثلاث كلمات", callback_data="count_3")],
         [InlineKeyboardButton("🔙 الرجوع للقائمة الرئيسية", callback_data="restart")]
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await query.message.edit_text("📝 اختر عدد الكلمات اليومية:", reply_markup=reply_markup)
 
-# 📌 عرض تقويم رمضان لاختيار اليوم
+# 📌 عرض تقويم رمضان لاختيار اليوم بشكل جميل
 async def select_day(update: Update, context: CallbackContext):
     query = update.callback_query
     user_id = query.from_user.id
@@ -58,23 +57,30 @@ async def select_day(update: Update, context: CallbackContext):
     # تحديث عدد الكلمات في قاعدة البيانات
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
-    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, selected_day, saved_words, last_reminder) VALUES (?, ?, ?, ?, ?)",
-                   (user_id, count, None, "", ""))
+    cursor.execute("INSERT OR REPLACE INTO users (user_id, daily_count, selected_day, saved_words) VALUES (?, ?, ?, ?)",
+                   (user_id, count, None, ""))
     conn.commit()
     conn.close()
 
-    # عرض تقويم رمضان
+    # إعداد تقويم رمضان بشكل مرتب
     keyboard = []
     year = datetime.now().year
-    month = 3  # رمضان يكون في مارس أو أبريل حسب السنة
+    month = 3  # رمضان غالبًا في مارس أو أبريل
     days_in_month = calendar.monthrange(year, month)[1]
 
-    for i in range(1, days_in_month + 1):
-        keyboard.append([InlineKeyboardButton(f"📅 يوم {i}", callback_data=f"day_{i}")])
+    row = []
+    for day in range(1, days_in_month + 1):
+        row.append(InlineKeyboardButton(f"{day}", callback_data=f"day_{day}"))
+        if len(row) == 7:  # كل 7 أيام في صف واحد
+            keyboard.append(row)
+            row = []
+    
+    if row:  # إضافة أي أيام متبقية في الصف الأخير
+        keyboard.append(row)
 
     keyboard.append([InlineKeyboardButton("🔙 الرجوع للخلف", callback_data="start_saving")])
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await query.message.edit_text("📆 اختر يومًا من رمضان:", reply_markup=reply_markup)
+    await query.message.edit_text("📆 *اختر يومًا من رمضان:*", reply_markup=reply_markup, parse_mode="Markdown")
 
 # 📌 عرض الكلمات المختارة للحفظ بعد اختيار اليوم
 async def show_words(update: Update, context: CallbackContext):
@@ -150,4 +156,4 @@ def main():
     app.run_polling()
 
 if __name__ == "__main__":
-    main()
+    main() 
