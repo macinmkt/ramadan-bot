@@ -1,8 +1,9 @@
 import os
 import random
 import sqlite3
+import requests
 from datetime import datetime, timedelta
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup, InputFile
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import Application, CommandHandler, CallbackContext, CallbackQueryHandler
 
 # 🔴 ضع توكن البوت الخاص بك هنا
@@ -28,7 +29,6 @@ async def main_menu(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🎯 بدء التحدي اليومي", callback_data="start_challenge")],
         [InlineKeyboardButton("🕌 مواقيت الصلاة", callback_data="prayer_times")],
         [InlineKeyboardButton("📖 أذكار الصباح والمساء", callback_data="dhikr")],
-        [InlineKeyboardButton("🎨 خلفيات رمضان", callback_data="send_background")],
         [InlineKeyboardButton("🏆 نقاطي", callback_data="show_score")],
         [InlineKeyboardButton("🏅 لوحة المتصدرين", callback_data="leaderboard")]
     ]
@@ -127,26 +127,41 @@ async def leaderboard(update: Update, context: CallbackContext):
 async def prayer_times(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()  # تأكيد استلام البيانات
-    await query.message.edit_text("🕌 *مواقيت الصلاة:*\n\nالفجر: 5:00 ص\nالظهر: 12:00 م\nالعصر: 3:30 م\nالمغرب: 6:00 م\nالعشاء: 7:30 م", parse_mode="Markdown")
+
+    # الحصول على مواقيت الصلاة باستخدام API
+    try:
+        # استبدل "CITY" و"COUNTRY" بالمدينة والبلد المطلوبة
+        url = "http://api.aladhan.com/v1/timingsByCity"
+        params = {
+            "city": "Cairo",  # يمكن تغييرها إلى المدينة المطلوبة
+            "country": "Egypt",  # يمكن تغييرها إلى البلد المطلوب
+            "method": 5  # طريقة الحساب (5 للأزهر)
+        }
+        response = requests.get(url, params=params)
+        data = response.json()
+
+        if response.status_code == 200:
+            timings = data["data"]["timings"]
+            prayer_times_text = (
+                f"🕌 *مواقيت الصلاة لليوم:*\n\n"
+                f"الفجر: {timings['Fajr']}\n"
+                f"الشروق: {timings['Sunrise']}\n"
+                f"الظهر: {timings['Dhuhr']}\n"
+                f"العصر: {timings['Asr']}\n"
+                f"المغرب: {timings['Maghrib']}\n"
+                f"العشاء: {timings['Isha']}\n"
+            )
+            await query.message.edit_text(prayer_times_text, parse_mode="Markdown")
+        else:
+            await query.message.edit_text("❌ حدث خطأ أثناء جلب مواقيت الصلاة. يرجى المحاولة لاحقًا.")
+    except Exception as e:
+        await query.message.edit_text(f"❌ حدث خطأ: {str(e)}")
 
 # 📌 أذكار الصباح والمساء
 async def dhikr(update: Update, context: CallbackContext):
     query = update.callback_query
     await query.answer()  # تأكيد استلام البيانات
     await query.message.edit_text("📖 *أذكار الصباح والمساء:*\n\nأذكار الصباح: ...\nأذكار المساء: ...", parse_mode="Markdown")
-
-# 📌 إرسال خلفية رمضانية
-async def send_background(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()  # تأكيد استلام البيانات
-    backgrounds = ["background1.jpg", "background2.jpg", "background3.jpg"]
-    selected_background = random.choice(backgrounds)
-    
-    try:
-        with open(selected_background, "rb") as photo:
-            await query.message.reply_photo(photo=InputFile(photo), caption="🎨 إليك خلفية رمضانية جميلة!")
-    except FileNotFoundError:
-        await query.message.reply_text("❌ عذرًا، حدث خطأ في إرسال الخلفية.")
 
 # 📌 إعداد البوت
 def main():
@@ -162,7 +177,6 @@ def main():
     app.add_handler(CallbackQueryHandler(leaderboard, pattern="leaderboard"))
     app.add_handler(CallbackQueryHandler(prayer_times, pattern="prayer_times"))
     app.add_handler(CallbackQueryHandler(dhikr, pattern="dhikr"))
-    app.add_handler(CallbackQueryHandler(send_background, pattern="send_background"))
     app.add_handler(CallbackQueryHandler(main_menu, pattern="main_menu"))
 
     app.run_polling()
