@@ -44,9 +44,28 @@ async def send_background(update: Update, context: CallbackContext):
     
     try:
         with open(selected_background, "rb") as photo:
-            await query.message.reply_photo(photo=InputFile(photo), caption="🎨 إليك خلفية رمضانية جميلة!")
+            await query.message.reply_photo(photo=photo, caption="🎨 إليك خلفية رمضانية جميلة!")
     except FileNotFoundError:
         await query.message.reply_text("❌ عذرًا، حدث خطأ في إرسال الخلفية.")
+
+# 📌 معالج للأزرار الأخرى لتجنب تعطلها
+async def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    data = query.data
+    
+    if data == "start_challenge":
+        await query.message.reply_text("🚀 تم بدء التحدي اليومي!")
+    elif data == "prayer_times":
+        await query.message.reply_text("🕌 مواقيت الصلاة متاحة قريبًا!")
+    elif data == "dhikr":
+        await query.message.reply_text("📖 أذكار الصباح والمساء قادمة قريبًا!")
+    elif data == "show_score":
+        await query.message.reply_text("🏆 نقاطك الحالية: 0")  # يمكنك تعديلها وفق قاعدة البيانات
+    elif data == "leaderboard":
+        await query.message.reply_text("🏅 لوحة المتصدرين ستتوفر قريبًا!")
+    else:
+        await query.message.reply_text("❌ خيار غير معروف.")
 
 # 📌 إعداد البوت
 def main():
@@ -55,8 +74,8 @@ def main():
 
     # إضافة المعالجات
     app.add_handler(CommandHandler("start", main_menu))
-    app.add_handler(CallbackQueryHandler(send_background, pattern="send_background"))  # معالج جديد
-    # أضف باقي المعالجات هنا...
+    app.add_handler(CallbackQueryHandler(send_background, pattern="send_background"))  # معالجة زر الخلفيات
+    app.add_handler(CallbackQueryHandler(button_handler))  # معالجة الأزرار الأخرى
 
     app.run_polling()
 
