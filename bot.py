@@ -28,7 +28,7 @@ async def main_menu(update: Update, context: CallbackContext):
         [InlineKeyboardButton("🎯 بدء التحدي اليومي", callback_data="start_challenge")],
         [InlineKeyboardButton("🕌 مواقيت الصلاة", callback_data="prayer_times")],
         [InlineKeyboardButton("📖 أذكار الصباح والمساء", callback_data="dhikr")],
-        [InlineKeyboardButton("🎨 خلفيات رمضان", callback_data="send_background")],  # زر جديد
+        [InlineKeyboardButton("🎨 خلفيات رمضان", callback_data="send_background")],
         [InlineKeyboardButton("🏆 نقاطي", callback_data="show_score")],
         [InlineKeyboardButton("🏅 لوحة المتصدرين", callback_data="leaderboard")]
     ]
@@ -38,18 +38,22 @@ async def main_menu(update: Update, context: CallbackContext):
 # 📌 إرسال خلفية رمضانية
 async def send_background(update: Update, context: CallbackContext):
     query = update.callback_query
-    # قائمة بخلفيات رمضان
+    await query.answer()  # تأكيد استلام البيانات
     backgrounds = ["background1.jpg", "background2.jpg", "background3.jpg"]
     selected_background = random.choice(backgrounds)
     
-    with open(selected_background, "rb") as photo:
-        await query.message.reply_photo(photo=InputFile(photo), caption="🎨 إليك خلفية رمضانية جميلة!")
+    try:
+        with open(selected_background, "rb") as photo:
+            await query.message.reply_photo(photo=InputFile(photo), caption="🎨 إليك خلفية رمضانية جميلة!")
+    except FileNotFoundError:
+        await query.message.reply_text("❌ عذرًا، حدث خطأ في إرسال الخلفية.")
 
 # 📌 إعداد البوت
 def main():
     init_db()
     app = Application.builder().token(TOKEN).build()
 
+    # إضافة المعالجات
     app.add_handler(CommandHandler("start", main_menu))
     app.add_handler(CallbackQueryHandler(send_background, pattern="send_background"))  # معالج جديد
     # أضف باقي المعالجات هنا...
