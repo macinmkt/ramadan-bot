@@ -181,16 +181,16 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_MENU: [
-                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$", per_message=False),
-                CallbackQueryHandler(memorize_words, pattern="^memorize_words$", per_message=False),
-                CallbackQueryHandler(main_menu, pattern="^main_menu$", per_message=False),
+                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
+                CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
             WORD_COUNT: [
-                CallbackQueryHandler(word_count, pattern="^one_word$", per_message=False),
-                CallbackQueryHandler(word_count, pattern="^two_words$", per_message=False),
+                CallbackQueryHandler(word_count, pattern="^one_word$"),
+                CallbackQueryHandler(word_count, pattern="^two_words$"),
             ],
             REVIEW_WORDS: [
-                CallbackQueryHandler(review_words, pattern="^review_words$", per_message=False),
+                CallbackQueryHandler(review_words, pattern="^review_words$"),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
