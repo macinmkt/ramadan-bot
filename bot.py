@@ -7,6 +7,7 @@ from telegram.ext import (
     CallbackContext,
     ConversationHandler,
 )
+from datetime import time, datetime, timedelta
 
 # جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
@@ -30,10 +31,40 @@ WORDS = [
 # حفظ الكلمات التي تم إرسالها للمستخدم
 user_data = {}
 
+# إرسال كلمة أو كلمتين يوميًا
+async def send_daily_words(context: CallbackContext):
+    job = context.job
+    user_id = job.chat_id
+    if user_id in user_data and user_data[user_id]["memorized_words"]:
+        words_to_send = user_data[user_id]["memorized_words"][:2]  # إرسال أول كلمتين
+        words_text = "\n\n".join(words_to_send)
+        await context.bot.send_message(chat_id=user_id, text=f"كلمات اليوم:\n\n{words_text}")
+
+# إرسال تذكير أسبوعي بجميع الكلمات المحفوظة
+async def send_weekly_reminder(context: CallbackContext):
+    job = context.job
+    user_id = job.chat_id
+    if user_id in user_data and user_data[user_id]["memorized_words"]:
+        words_text = "\n\n".join(user_data[user_id]["memorized_words"])
+        await context.bot.send_message(chat_id=user_id, text=f"مراجعة الكلمات المحفوظة:\n\n{words_text}")
+
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_data[user_id] = {"memorized_words": []}  # تهيئة بيانات المستخدم
+
+    # جدولة المهام
+    context.job_queue.run_daily(
+        send_daily_words,
+        time=time(hour=15, minute=0),  # الساعة 3 مساءً (يمكن تعديلها)
+        chat_id=user_id,
+    )
+    context.job_queue.run_repeating(
+        send_weekly_reminder,
+        interval=timedelta(days=7),  # كل أسبوع
+        first=datetime.now() + timedelta(days=(6 - datetime.now().weekday())),  # يوم الجمعة القادم
+        chat_id=user_id,
+    )
 
     keyboard = [
         [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
