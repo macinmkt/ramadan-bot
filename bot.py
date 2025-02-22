@@ -165,13 +165,17 @@ async def review_words(update: Update, context: CallbackContext):
     # جلب الكلمات المحفوظة
     memorized_words = user_data[user_id]["memorized_words"]
     if memorized_words:
-        words_text = "\n\n".join(memorized_words)
+        # تنسيق الكلمات بشكل جديد
+        words_text = "📖 *الكلمات العلية* 📖\n\n"
+        for i, word in enumerate(memorized_words, start=1):
+            words_text += f"الكلمة {i}: {word}\n\n"
+
         keyboard = [
             [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            f"📖 *الكلمات التي قمت بحفظها* 📖\n\n{words_text}",
+            words_text,
             reply_markup=reply_markup,
             parse_mode="Markdown",
         )
