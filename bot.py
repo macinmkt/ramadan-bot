@@ -1,13 +1,9 @@
 import os
-import sqlite3
-import requests
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     Application,
     CommandHandler,
     CallbackQueryHandler,
-    MessageHandler,
-    filters,
     CallbackContext,
     ConversationHandler,
 )
@@ -18,49 +14,33 @@ if not TOKEN:
     raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
 
 # حالات المحادثة
-MAIN_MENU, CITY_INPUT, DAILY_FAIDAH, MEMORIZE_WORDS, WORD_COUNT = range(5)
+MAIN_MENU, WORD_COUNT, REVIEW_WORDS = range(3)
 
-# دالة جلب مواقيت الصلاة بناءً على المدينة
-def get_prayer_times(city, country="SA", method=4):
-    url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
-    try:
-        response = requests.get(url).json()
-        if "data" in response:
-            timings = response["data"]["timings"]
-            hijri_date = response["data"]["date"]["hijri"]["date"]
-            prayer_times_text = f"🕌 مواقيت الصلاة في {city}, {country} - 📆 {hijri_date}:\n\n"
-            prayer_order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
-            for prayer in prayer_order:
-                prayer_times_text += f"{prayer}: {timings[prayer]}\n"
-            return prayer_times_text
-        return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة والدولة."
-    except requests.RequestException as e:
-        return f"❌ حدث خطأ أثناء جلب المواقيت: {e}"
+# قائمة الكلمات
+WORDS = [
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+]
+
+# حفظ الكلمات التي تم إرسالها للمستخدم
+user_data = {}
 
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user_data[user_id] = {"memorized_words": []}  # تهيئة بيانات المستخدم
+
     keyboard = [
-        [InlineKeyboardButton("مواقيت الصلوات", callback_data="prayer_times")],
         [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
         [InlineKeyboardButton("اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text("مرحبًا! اختر من القائمة:", reply_markup=reply_markup)
-    return MAIN_MENU
-
-# معالجة اختيار مواقيت الصلوات
-async def prayer_times(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
-    await update.callback_query.edit_message_text("🔍 أدخل اسم المدينة للحصول على مواقيت الصلاة:")
-    return CITY_INPUT
-
-# معالجة إدخال المدينة
-async def city_input(update: Update, context: CallbackContext):
-    city = update.message.text.strip()
-    prayer_times = get_prayer_times(city)
-    keyboard = [[InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(prayer_times, reply_markup=reply_markup)
     return MAIN_MENU
 
 # معالجة اختيار باقة الفوائد اليومية
@@ -77,34 +57,81 @@ async def daily_faidah(update: Update, context: CallbackContext):
 # معالجة اختيار برنامج حفظ الكلمات العلية
 async def memorize_words(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    keyboard = [
-        [InlineKeyboardButton("كلمة واحدة", callback_data="one_word")],
-        [InlineKeyboardButton("كلمتين", callback_data="two_words")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(
-        "كم عدد الكلمات التي تريد حفظها؟", reply_markup=reply_markup
-    )
-    return WORD_COUNT
+    user_id = update.callback_query.from_user.id
+
+    # إذا كان المستخدم قد حفظ كلمات من قبل، نعرض خيار "مراجعة الكلمات"
+    if user_data[user_id]["memorized_words"]:
+        keyboard = [
+            [InlineKeyboardButton("مراجعة الكلمات", callback_data="review_words")],
+            [InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            "لقد قمت بحفظ كلمات من قبل. اختر مراجعة الكلمات:", reply_markup=reply_markup
+        )
+        return REVIEW_WORDS
+    else:
+        # إذا لم يحفظ كلمات من قبل، نعرض خيار "كلمة واحدة" أو "كلمتين"
+        keyboard = [
+            [InlineKeyboardButton("كلمة واحدة", callback_data="one_word")],
+            [InlineKeyboardButton("كلمتين", callback_data="two_words")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            "كم عدد الكلمات التي تريد حفظها؟", reply_markup=reply_markup
+        )
+        return WORD_COUNT
 
 # معالجة اختيار عدد الكلمات
 async def word_count(update: Update, context: CallbackContext):
     await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
     choice = update.callback_query.data
+
     if choice == "one_word":
-        message = "✅ تم الاشتراك في برنامج حفظ كلمة واحدة يوميًا."
+        words_to_send = WORDS[:1]  # إرسال كلمة واحدة
     else:
-        message = "✅ تم الاشتراك في برنامج حفظ كلمتين يوميًا."
-    keyboard = [[InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")]]
+        words_to_send = WORDS[:2]  # إرسال كلمتين
+
+    # حفظ الكلمات التي تم إرسالها
+    user_data[user_id]["memorized_words"].extend(words_to_send)
+
+    # إرسال الكلمات للمستخدم
+    words_text = "\n\n".join(words_to_send)
+    keyboard = [
+        [InlineKeyboardButton("تم الحفظ", callback_data="main_menu")],
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(message, reply_markup=reply_markup)
+    await update.callback_query.edit_message_text(
+        f"الكلمات التي تم إرسالها:\n\n{words_text}", reply_markup=reply_markup
+    )
+    return MAIN_MENU
+
+# معالجة مراجعة الكلمات
+async def review_words(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+
+    # جلب الكلمات المحفوظة
+    memorized_words = user_data[user_id]["memorized_words"]
+    if memorized_words:
+        words_text = "\n\n".join(memorized_words)
+        keyboard = [
+            [InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            f"الكلمات التي قمت بحفظها:\n\n{words_text}", reply_markup=reply_markup
+        )
+    else:
+        await update.callback_query.edit_message_text("لم تقم بحفظ أي كلمات حتى الآن.")
+
     return MAIN_MENU
 
 # الرجوع للقائمة الرئيسية
 async def main_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     keyboard = [
-        [InlineKeyboardButton("مواقيت الصلوات", callback_data="prayer_times")],
         [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
         [InlineKeyboardButton("اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
@@ -120,15 +147,16 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_MENU: [
-                CallbackQueryHandler(prayer_times, pattern="^prayer_times$"),
                 CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
                 CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
                 CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
-            CITY_INPUT: [MessageHandler(filters.TEXT & ~filters.COMMAND, city_input)],
             WORD_COUNT: [
                 CallbackQueryHandler(word_count, pattern="^one_word$"),
                 CallbackQueryHandler(word_count, pattern="^two_words$"),
+            ],
+            REVIEW_WORDS: [
+                CallbackQueryHandler(review_words, pattern="^review_words$"),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
