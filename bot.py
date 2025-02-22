@@ -4,10 +4,8 @@ import sqlite3
 from telegram import Update
 from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
 
-# جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
 
-# دالة جلب مواقيت الصلاة بناءً على المدينة
 def get_prayer_times(city, country="SA", method=4):
     url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
     response = requests.get(url).json()
@@ -25,7 +23,6 @@ def get_prayer_times(city, country="SA", method=4):
  
     return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة والدولة."
 
-# دالة استقبال المدينة وإرسال المواقيت
 async def prayer_command(update: Update, context: CallbackContext):
     await update.message.reply_text("🔍 أدخل اسم المدينة للحصول على مواقيت الصلاة:")
 
@@ -34,7 +31,6 @@ async def handle_city(update: Update, context: CallbackContext):
     prayer_times = get_prayer_times(city, country="SA", method=4)
     await update.message.reply_text(prayer_times)
 
-# دالة إرسال فائدة عشوائية من قاعدة البيانات
 async def send_faidah(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -47,7 +43,6 @@ async def send_faidah(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا توجد فوائد متاحة حاليًا.")
 
-# دالة المسابقة الإسلامية
 async def quiz_command(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -61,7 +56,6 @@ async def quiz_command(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا توجد أسئلة متاحة حاليًا.")
 
-# دالة التحقق من إجابة المستخدم
 async def check_answer(update: Update, context: CallbackContext):
     user_answer = update.message.text.strip()
     correct_answer = context.user_data.get("answer", "")
@@ -78,7 +72,6 @@ async def check_answer(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
 
-# دالة اختيار الفائز العشوائي
 async def pick_winner(update: Update, context: CallbackContext):
     conn = sqlite3.connect("ramadan_bot.db")
     cursor = conn.cursor()
@@ -91,7 +84,6 @@ async def pick_winner(update: Update, context: CallbackContext):
     else:
         await update.message.reply_text("❌ لا يوجد مشاركون حتى الآن.")
 
-# إعداد البوت وتشغيله
 def main():
     app = Application.builder().token(TOKEN).build()
 
@@ -104,8 +96,7 @@ def main():
     )))
 
     app.add_handler(CommandHandler("prayer", prayer_command))
-    app.
-    add_handler(CommandHandler("faidah", send_faidah))
+    app.add_handler(CommandHandler("faidah", send_faidah))
     app.add_handler(CommandHandler("quiz", quiz_command))
     app.add_handler(CommandHandler("winner", pick_winner))
 
@@ -114,5 +105,5 @@ def main():
 
     app.run_polling()
 
-if name == "__main__":
+if __name__ == "__main__":
     main()
