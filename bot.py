@@ -1,7 +1,7 @@
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    ApplicationBuilder,  # استخدام ApplicationBuilder بدلاً من Application
+    ApplicationBuilder,
     CommandHandler,
     CallbackQueryHandler,
     CallbackContext,
@@ -38,7 +38,7 @@ async def send_daily_words(context: CallbackContext):
     if user_id in user_data and user_data[user_id]["memorized_words"]:
         words_to_send = user_data[user_id]["memorized_words"][:2]  # إرسال أول كلمتين
         words_text = "\n\n".join(words_to_send)
-        await context.bot.send_message(chat_id=user_id, text=f"كلمات اليوم:\n\n{words_text}")
+        await context.bot.send_message(chat_id=user_id, text=f"🌟 *كلمات اليوم* 🌟\n\n{words_text}")
 
 # إرسال تذكير أسبوعي بجميع الكلمات المحفوظة
 async def send_weekly_reminder(context: CallbackContext):
@@ -46,7 +46,7 @@ async def send_weekly_reminder(context: CallbackContext):
     user_id = job.chat_id
     if user_id in user_data and user_data[user_id]["memorized_words"]:
         words_text = "\n\n".join(user_data[user_id]["memorized_words"])
-        await context.bot.send_message(chat_id=user_id, text=f"مراجعة الكلمات المحفوظة:\n\n{words_text}")
+        await context.bot.send_message(chat_id=user_id, text=f"🕌 *مراجعة الكلمات المحفوظة* 🕌\n\n{words_text}")
 
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
@@ -68,22 +68,34 @@ async def start(update: Update, context: CallbackContext):
             chat_id=user_id,
         )
 
+    # رسالة ترحيبية
+    welcome_message = (
+        "🌙 *رمضان كريم* 🌙\n\n"
+        "مرحبًا بك في بوت رمضان! هنا يمكنك:\n"
+        "- الحصول على فوائد يومية.\n"
+        "- حفظ الكلمات العلية.\n"
+        "- تذكير يومي بأوقات الصلاة.\n\n"
+        "اختر من القائمة أدناه:"
+    )
+
     keyboard = [
-        [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
-        [InlineKeyboardButton("اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("🌙 اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
+        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text("مرحبًا! اختر من القائمة:", reply_markup=reply_markup)
+    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
     return MAIN_MENU
 
 # معالجة اختيار باقة الفوائد اليومية
 async def daily_faidah(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    keyboard = [[InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")]]
+    keyboard = [[InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        "✅ تم الاشتراك في باقة الفوائد اليومية. سيتم إرسال فوائد خلال اليوم والليلة.",
+        "🌟 *تم الاشتراك في باقة الفوائد اليومية* 🌟\n\n"
+        "سيتم إرسال فوائد خلال اليوم والليلة. تقبل الله طاعاتكم!",
         reply_markup=reply_markup,
+        parse_mode="Markdown",
     )
     return MAIN_MENU
 
@@ -95,23 +107,26 @@ async def memorize_words(update: Update, context: CallbackContext):
     # إذا كان المستخدم قد حفظ كلمات من قبل، نعرض خيار "مراجعة الكلمات"
     if user_data[user_id]["memorized_words"]:
         keyboard = [
-            [InlineKeyboardButton("مراجعة الكلمات", callback_data="review_words")],
-            [InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")],
+            [InlineKeyboardButton("📖 مراجعة الكلمات", callback_data="review_words")],
+            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            "لقد قمت بحفظ كلمات من قبل. اختر مراجعة الكلمات:", reply_markup=reply_markup
+            "لقد قمت بحفظ كلمات من قبل. اختر مراجعة الكلمات:",
+            reply_markup=reply_markup,
         )
         return REVIEW_WORDS
     else:
         # إذا لم يحفظ كلمات من قبل، نعرض خيار "كلمة واحدة" أو "كلمتين"
         keyboard = [
-            [InlineKeyboardButton("كلمة واحدة", callback_data="one_word")],
-            [InlineKeyboardButton("كلمتين", callback_data="two_words")],
+            [InlineKeyboardButton("📜 كلمة واحدة", callback_data="one_word")],
+            [InlineKeyboardButton("📜 كلمتين", callback_data="two_words")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            "كم عدد الكلمات التي تريد حفظها؟", reply_markup=reply_markup
+            "🌙 *كم عدد الكلمات التي تريد حفظها؟* 🌙",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
         )
         return WORD_COUNT
 
@@ -132,11 +147,13 @@ async def word_count(update: Update, context: CallbackContext):
     # إرسال الكلمات للمستخدم
     words_text = "\n\n".join(words_to_send)
     keyboard = [
-        [InlineKeyboardButton("تم الحفظ", callback_data="main_menu")],
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data="main_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        f"الكلمات التي تم إرسالها:\n\n{words_text}", reply_markup=reply_markup
+        f"🌟 *الكلمات التي تم إرسالها* 🌟\n\n{words_text}",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
     )
     return MAIN_MENU
 
@@ -150,11 +167,13 @@ async def review_words(update: Update, context: CallbackContext):
     if memorized_words:
         words_text = "\n\n".join(memorized_words)
         keyboard = [
-            [InlineKeyboardButton("رجوع للقائمة الرئيسية", callback_data="main_menu")],
+            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            f"الكلمات التي قمت بحفظها:\n\n{words_text}", reply_markup=reply_markup
+            f"📖 *الكلمات التي قمت بحفظها* 📖\n\n{words_text}",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
         )
     else:
         await update.callback_query.edit_message_text("لم تقم بحفظ أي كلمات حتى الآن.")
@@ -165,11 +184,15 @@ async def review_words(update: Update, context: CallbackContext):
 async def main_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     keyboard = [
-        [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
-        [InlineKeyboardButton("اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("🌙 اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
+        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text("اختر من القائمة:", reply_markup=reply_markup)
+    await update.callback_query.edit_message_text(
+        "🌙 *اختر من القائمة* 🌙",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
     return MAIN_MENU
 
 # إعداد البوت وتشغيله
