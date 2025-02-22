@@ -1,69 +1,91 @@
-from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
-from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
-import asyncio
-import datetime
+/app/bot.py:67: DeprecationWarning: There is no current event loop
 
-TOKEN = "YOUR_BOT_TOKEN"
-subscribed_users = {"prayer_times": {}, "daily_fawaid": set(), "word_memorization": {}}
+  loop = asyncio.get_event_loop()
 
-def main_menu():
-    keyboard = [
-        [InlineKeyboardButton("🕌 مواقيت الصلوات", callback_data="prayer_times")],
-        [InlineKeyboardButton("📜 اشترك في باقة الفوائد اليومية", callback_data="daily_fawaid")],
-        [InlineKeyboardButton("📖 اشترك في برنامج حفظ الكلمات العُلية", callback_data="word_memorization")]
-    ]
-    return InlineKeyboardMarkup(keyboard)
+Traceback (most recent call last):
 
-async def start(update: Update, context: CallbackContext):
-    await update.message.reply_text("مرحبًا بك في البوت! اختر أحد الخيارات:", reply_markup=main_menu())
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 547, in initialize
 
-async def handle_buttons(update: Update, context: CallbackContext):
-    query = update.callback_query
-    await query.answer()
-    
-    if query.data == "prayer_times":
-        await query.message.reply_text("✍️ اكتب اسم مدينتك للحصول على مواقيت الصلاة:")
-        context.user_data["awaiting_city"] = True
-    elif query.data == "daily_fawaid":
-        subscribed_users["daily_fawaid"].add(query.from_user.id)
-        await query.message.reply_text("✅ تم الاشتراك في باقة الفوائد اليومية!", reply_markup=main_menu())
-    elif query.data == "word_memorization":
-        keyboard = [[InlineKeyboardButton("كلمة واحدة", callback_data="word_1"), InlineKeyboardButton("كلمتين", callback_data="word_2")]]
-        await query.message.reply_text("📖 كم عدد الكلمات التي تريد حفظها؟", reply_markup=InlineKeyboardMarkup(keyboard))
-    elif query.data in ["word_1", "word_2"]:
-        num_words = 1 if query.data == "word_1" else 2
-        subscribed_users["word_memorization"][query.from_user.id] = num_words
-        await query.message.reply_text(f"✅ تم الاشتراك في برنامج حفظ {num_words} كلمة يوميًا!", reply_markup=main_menu())
+    await self.get_me()
 
-async def handle_text(update: Update, context: CallbackContext):
-    if context.user_data.get("awaiting_city"):
-        city = update.message.text
-        context.user_data["awaiting_city"] = False
-        prayer_times = get_prayer_times(city)  # تحتاج لدمج API
-        if prayer_times:
-            await update.message.reply_text(f"🕌 مواقيت الصلاة في {city} \n{prayer_times}", reply_markup=main_menu())
-        else:
-            await update.message.reply_text("❌ لم أتمكن من جلب مواقيت الصلاة. تأكد من صحة اسم المدينة.")
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 1677, in get_me
 
-async def send_reminders():
-    while True:
-        now = datetime.datetime.now()
-        if now.hour == 15 and now.minute == 0:  # وقت العصر
-            for user_id, num_words in subscribed_users["word_memorization"].items():
-                await application.bot.send_message(user_id, f"📖 كلمتك اليوم: ...")
-        if now.weekday() == 4 and now.hour == 14 and now.minute == 0:  # يوم الجمعة قبل العصر
-            for user_id in subscribed_users["word_memorization"]:
-                await application.bot.send_message(user_id, "🔄 تذكير بجميع الكلمات المحفوظة سابقًا: ...")
-        await asyncio.sleep(60)  # التحقق كل دقيقة
+    return await super().get_me(
 
-def get_prayer_times(city):
-    return "🕋 الفجر: 5:00 ص، الظهر: 12:30 م، العصر: 3:45 م، المغرب: 6:15 م، العشاء: 8:00 م"
+           ^^^^^^^^^^^^^^^^^^^^^
 
-application = Application.builder().token(TOKEN).build()
-application.add_handler(CommandHandler("start", start))
-application.add_handler(CallbackQueryHandler(handle_buttons))
-application.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text))
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 334, in decorator
 
-loop = asyncio.get_event_loop()
-loop.create_task(send_reminders())
-application.run_polling()
+    result = await func(*args, **kwargs)  # skipcq: PYL-E1102
+
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 692, in get_me
+
+    result = await self._post(
+
+             ^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 422, in _post
+
+    return await self._do_post(
+
+           ^^^^^^^^^^^^^^^^^^^^
+
+    return self.__run(
+
+           ^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 306, in _do_post
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_application.py", line 881, in __run
+
+    return await super()._do_post(
+
+    raise exc
+
+           ^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_application.py", line 870, in __run
+
+    loop.run_until_complete(self.initialize())
+
+  File "/root/.nix-profile/lib/python3.12/asyncio/base_events.py", line 687, in run_until_complete
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 453, in _do_post
+
+    return future.result()
+
+    return await request.post(
+
+           ^^^^^^^^^^^^^^^
+
+           ^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 165, in post
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_application.py", line 376, in initialize
+
+    result = await self._request_wrapper(
+
+    await self.bot.initialize()
+
+             ^^^^^^^^^^^^^^^^^^^^^^^^^^^^
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/ext/_extbot.py", line 252, in initialize
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/request/_baserequest.py", line 326, in _request_wrapper
+
+    await super().initialize()
+
+  File "/opt/venv/lib/python3.12/site-packages/telegram/_bot.py", line 549, in initialize
+
+    raise InvalidToken(f"The token `{self._token}` was rejected by the server.") from exc
+
+    raise InvalidToken(message)
+
+telegram.error.InvalidToken: The token `YOUR_BOT_TOKEN` was rejected by the server.
+
+Task was destroyed but it is pending!
+
+telegram.error.InvalidToken: Not Found
