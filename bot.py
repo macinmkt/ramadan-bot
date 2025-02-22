@@ -1,7 +1,7 @@
 import os
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
-    Application,
+    ApplicationBuilder,  # استخدام ApplicationBuilder بدلاً من Application
     CommandHandler,
     CallbackQueryHandler,
     CallbackContext,
@@ -53,18 +53,20 @@ async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_data[user_id] = {"memorized_words": []}  # تهيئة بيانات المستخدم
 
-    # جدولة المهام
-    context.job_queue.run_daily(
-        send_daily_words,
-        time=time(hour=15, minute=0),  # الساعة 3 مساءً (يمكن تعديلها)
-        chat_id=user_id,
-    )
-    context.job_queue.run_repeating(
-        send_weekly_reminder,
-        interval=timedelta(days=7),  # كل أسبوع
-        first=datetime.now() + timedelta(days=(6 - datetime.now().weekday())),  # يوم الجمعة القادم
-        chat_id=user_id,
-    )
+    # تأكد من وجود job_queue
+    if context.job_queue:
+        # جدولة المهام
+        context.job_queue.run_daily(
+            send_daily_words,
+            time=time(hour=15, minute=0),  # الساعة 3 مساءً (يمكن تعديلها)
+            chat_id=user_id,
+        )
+        context.job_queue.run_repeating(
+            send_weekly_reminder,
+            interval=timedelta(days=7),  # كل أسبوع
+            first=datetime.now() + timedelta(days=(6 - datetime.now().weekday())),  # يوم الجمعة القادم
+            chat_id=user_id,
+        )
 
     keyboard = [
         [InlineKeyboardButton("اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
@@ -172,22 +174,23 @@ async def main_menu(update: Update, context: CallbackContext):
 
 # إعداد البوت وتشغيله
 def main():
-    app = Application.builder().token(TOKEN).build()
+    # استخدام ApplicationBuilder لإنشاء Application مع JobQueue
+    app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_MENU: [
-                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
-                CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
-                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
+                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$", per_message=False),
+                CallbackQueryHandler(memorize_words, pattern="^memorize_words$", per_message=False),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$", per_message=False),
             ],
             WORD_COUNT: [
-                CallbackQueryHandler(word_count, pattern="^one_word$"),
-                CallbackQueryHandler(word_count, pattern="^two_words$"),
+                CallbackQueryHandler(word_count, pattern="^one_word$", per_message=False),
+                CallbackQueryHandler(word_count, pattern="^two_words$", per_message=False),
             ],
             REVIEW_WORDS: [
-                CallbackQueryHandler(review_words, pattern="^review_words$"),
+                CallbackQueryHandler(review_words, pattern="^review_words$", per_message=False),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
