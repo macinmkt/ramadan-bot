@@ -1,108 +1,66 @@
-import requests
 import os
 import sqlite3
-from telegram import Update
-from telegram.ext import Application, CommandHandler, MessageHandler, filters, CallbackContext
+import requests
+from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
+from telegram.ext import Application, CommandHandler, CallbackQueryHandler, MessageHandler, filters, CallbackContext
 
 TOKEN = os.getenv("TOKEN")
+
+def main_menu():
+    keyboard = [[InlineKeyboardButton("🕌 مواقيت الصلوات", callback_data="prayer")],
+                [InlineKeyboardButton("💡 اشترك في باقة الفوائد اليومية", callback_data="subscribe_faidah")],
+                [InlineKeyboardButton("📖 اشترك في برنامج حفظ الكلمات العلية", callback_data="subscribe_words")]]
+    return InlineKeyboardMarkup(keyboard)
+
+async def start(update: Update, context: CallbackContext):
+    await update.message.reply_text("🌙 مرحبًا في بوت رمضان! اختر من القائمة أدناه:", reply_markup=main_menu())
+
+async def button_handler(update: Update, context: CallbackContext):
+    query = update.callback_query
+    await query.answer()
+    
+    if query.data == "prayer":
+        await query.message.edit_text("🔍 أدخل اسم المدينة للحصول على مواقيت الصلاة:")
+        context.user_data["awaiting_city"] = True
+    elif query.data == "subscribe_faidah":
+        await query.message.edit_text("✅ تم الاشتراك في باقة الفوائد اليومية! سيتم إرسال فوائد خلال اليوم والليلة.", reply_markup=back_to_main())
+    elif query.data == "subscribe_words":
+        keyboard = [[InlineKeyboardButton("كلمة", callback_data="word_1")],
+                    [InlineKeyboardButton("كلمتين", callback_data="word_2")]]
+        await query.message.edit_text("📖 كم عدد الكلمات التي تريد حفظها؟", reply_markup=InlineKeyboardMarkup(keyboard))
+    elif query.data in ["word_1", "word_2"]:
+        await query.message.edit_text("✅ تم الاشتراك في برنامج حفظ الكلمات العلية! سيتم تذكيرك كل يوم بالعصر بكلمة.", reply_markup=back_to_main())
+    elif query.data == "back":
+        await query.message.edit_text("🌙 مرحبًا في بوت رمضان! اختر من القائمة أدناه:", reply_markup=main_menu())
+
+async def handle_city(update: Update, context: CallbackContext):
+    if "awaiting_city" in context.user_data and context.user_data["awaiting_city"]:
+        city = update.message.text.strip()
+        prayer_times = get_prayer_times(city)
+        await update.message.reply_text(prayer_times, reply_markup=back_to_main())
+        context.user_data["awaiting_city"] = False
 
 def get_prayer_times(city, country="SA", method=4):
     url = f"http://api.aladhan.com/v1/timingsByCity?city={city}&country={country}&method={method}"
     response = requests.get(url).json()
-
     if "data" in response:
         timings = response["data"]["timings"]
         hijri_date = response["data"]["date"]["hijri"]["date"]
-        prayer_times_text = f"🕌 مواقيت الصلاة في {city}, {country} - 📆 {hijri_date}:\n\n"
-
-        prayer_order = ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]
-        for prayer in prayer_order:
+        prayer_times_text = f"🕌 مواقيت الصلاة في {city} - 📆 {hijri_date}:
+"
+        for prayer in ["Fajr", "Sunrise", "Dhuhr", "Asr", "Maghrib", "Isha"]:
             prayer_times_text += f"{prayer}: {timings[prayer]}\n"
-
         return prayer_times_text
- 
-    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة والدولة."
+    return "❌ لم يتم العثور على المواقيت، تأكد من اسم المدينة."
 
-async def prayer_command(update: Update, context: CallbackContext):
-    await update.message.reply_text("🔍 أدخل اسم المدينة للحصول على مواقيت الصلاة:")
-
-async def handle_city(update: Update, context: CallbackContext):
-    city = update.message.text.strip()
-    prayer_times = get_prayer_times(city, country="SA", method=4)
-    await update.message.reply_text(prayer_times)
-
-async def send_faidah(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT text FROM faidah ORDER BY RANDOM() LIMIT 1")
-    faidah = cursor.fetchone()
-    conn.close()
-
-    if faidah:
-        await update.message.reply_text(f"💡 {faidah[0]}")
-    else:
-        await update.message.reply_text("❌ لا توجد فوائد متاحة حاليًا.")
-
-async def quiz_command(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT question, answer FROM quiz ORDER BY RANDOM() LIMIT 1")
-    question = cursor.fetchone()
-    conn.close()
-
-    if question:
-        context.user_data["answer"] = question[1]
-        await update.message.reply_text(f"❓ {question[0]}")
-    else:
-        await update.message.reply_text("❌ لا توجد أسئلة متاحة حاليًا.")
-
-async def check_answer(update: Update, context: CallbackContext):
-    user_answer = update.message.text.strip()
-    correct_answer = context.user_data.get("answer", "")
-
-    if user_answer.lower() == correct_answer.lower():
-        await update.message.reply_text("✅ إجابة صحيحة! تم تسجيلك في السحب.")
-        
-        conn = sqlite3.connect("ramadan_bot.db")
-        cursor = conn.cursor()
-        cursor.execute("INSERT INTO participants (user_id, username, correct_answers) VALUES (?, ?, ?)",
-                       (update.message.from_user.id, update.message.from_user.username, 1))
-        conn.commit()
-        conn.close()
-    else:
-        await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
-
-async def pick_winner(update: Update, context: CallbackContext):
-    conn = sqlite3.connect("ramadan_bot.db")
-    cursor = conn.cursor()
-    cursor.execute("SELECT username FROM participants ORDER BY RANDOM() LIMIT 1")
-    winner = cursor.fetchone()
-    conn.close()
-
-    if winner:
-        await update.message.reply_text(f"🎉 الفائز لهذا الأسبوع هو: @{winner[0]}! سيتم إرسال الجائزة له.")
-    else:
-        await update.message.reply_text("❌ لا يوجد مشاركون حتى الآن.")
+def back_to_main():
+    return InlineKeyboardMarkup([[InlineKeyboardButton("🔙 العودة للقائمة الرئيسية", callback_data="back")]])
 
 def main():
     app = Application.builder().token(TOKEN).build()
-
-    app.add_handler(CommandHandler("start", lambda u, c: u.message.reply_text(
-        "🌙 مرحبًا في بوت رمضان!\n"
-        "🕌 استخدم /prayer لمواقيت الصلاة\n"
-        "💡 استخدم /faidah للحصول على فائدة\n"
-        "❓ استخدم /quiz للمشاركة في المسابقة\n"
-        "🏆 استخدم /winner لاختيار الفائز الأسبوعي"
-    )))
-
-    app.add_handler(CommandHandler("prayer", prayer_command))
-    app.add_handler(CommandHandler("faidah", send_faidah))
-    app.add_handler(CommandHandler("quiz", quiz_command))
-    app.add_handler(CommandHandler("winner", pick_winner))
-
+    app.add_handler(CommandHandler("start", start))
+    app.add_handler(CallbackQueryHandler(button_handler))
     app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, handle_city))
-    app.add_handler(MessageHandler(filters.TEXT & ~filters.COMMAND, check_answer))
-
     app.run_polling()
 
 if __name__ == "__main__":
