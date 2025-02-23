@@ -1,4 +1,5 @@
 import os
+import random
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -19,6 +20,17 @@ if not TOKEN:
 # حالات المحادثة
 MAIN_MENU, WORD_COUNT, REVIEW_WORDS, COMPLETE_GAP = range(4)
 
+# قائمة الكلمات
+WORDS = [
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+]
+
 # قائمة الجمل الناقصة
 GAP_SENTENCES = [
     {"sentence": "هذا النص هو مثال لنص يمكن أن ______ في نفس المساحة.", "answer": "يستبدل"},
@@ -28,42 +40,10 @@ GAP_SENTENCES = [
 # حفظ الكلمات التي تم إرسالها للمستخدم
 user_data = {}
 
-# إرسال كلمة أو كلمتين يوميًا
-async def send_daily_words(context: CallbackContext):
-    job = context.job
-    user_id = job.chat_id
-    if user_id in user_data and user_data[user_id]["memorized_words"]:
-        words_to_send = user_data[user_id]["memorized_words"][:2]  # إرسال أول كلمتين
-        words_text = "\n\n".join(words_to_send)
-        await context.bot.send_message(chat_id=user_id, text=f"🌟 *كلمات اليوم* 🌟\n\n{words_text}")
-
-# إرسال تذكير أسبوعي بجميع الكلمات المحفوظة
-async def send_weekly_reminder(context: CallbackContext):
-    job = context.job
-    user_id = job.chat_id
-    if user_id in user_data and user_data[user_id]["memorized_words"]:
-        words_text = "\n\n".join(user_data[user_id]["memorized_words"])
-        await context.bot.send_message(chat_id=user_id, text=f"🕌 *مراجعة الكلمات المحفوظة* 🕌\n\n{words_text}")
-
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_data[user_id] = {"memorized_words": [], "points": 0}  # تهيئة بيانات المستخدم
-
-    # تأكد من وجود job_queue
-    if context.job_queue:
-        # جدولة المهام
-        context.job_queue.run_daily(
-            send_daily_words,
-            time=time(hour=15, minute=0),  # الساعة 3 مساءً (يمكن تعديلها)
-            chat_id=user_id,
-        )
-        context.job_queue.run_repeating(
-            send_weekly_reminder,
-            interval=timedelta(days=7),  # كل أسبوع
-            first=datetime.now() + timedelta(days=(6 - datetime.now().weekday())),  # يوم الجمعة القادم
-            chat_id=user_id,
-        )
 
     # رسالة ترحيبية
     welcome_message = (
@@ -140,6 +120,8 @@ async def word_count(update: Update, context: CallbackContext):
         words_to_send = WORDS[:2]  # إرسال كلمتين
 
     # حفظ الكلمات التي تم إرسالها
+    if "memorized_words" not in user_data[user_id]:
+        user_data[user_id]["memorized_words"] = []
     user_data[user_id]["memorized_words"].extend(words_to_send)
 
     # إرسال الكلمات مع زر تأكيد الحفظ
@@ -204,6 +186,8 @@ async def handle_gap_answer(update: Update, context: CallbackContext):
 
     if gap_sentence and user_answer.lower() == gap_sentence["answer"].lower():
         # إضافة نقاط للمستخدم
+        if "points" not in user_data[user_id]:
+            user_data[user_id]["points"] = 0
         user_data[user_id]["points"] += 10
         await update.message.reply_text(f"✅ إجابة صحيحة! نقاطك الآن: {user_data[user_id]['points']}")
     else:
