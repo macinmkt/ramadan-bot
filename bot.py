@@ -6,6 +6,8 @@ from telegram.ext import (
     CallbackQueryHandler,
     CallbackContext,
     ConversationHandler,
+    MessageHandler,
+    filters,
 )
 from datetime import time, datetime, timedelta
 
@@ -15,17 +17,12 @@ if not TOKEN:
     raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
 
 # حالات المحادثة
-MAIN_MENU, WORD_COUNT, REVIEW_WORDS = range(3)
+MAIN_MENU, WORD_COUNT, REVIEW_WORDS, COMPLETE_GAP = range(4)
 
-# قائمة الكلمات
-WORDS = [
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+# قائمة الجمل الناقصة
+GAP_SENTENCES = [
+    {"sentence": "هذا النص هو مثال لنص يمكن أن ______ في نفس المساحة.", "answer": "يستبدل"},
+    {"sentence": "لقد تم توليد هذا النص من مولد النص العربى، ______.", "answer": "حيث"},
 ]
 
 # حفظ الكلمات التي تم إرسالها للمستخدم
@@ -51,7 +48,7 @@ async def send_weekly_reminder(context: CallbackContext):
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    user_data[user_id] = {"memorized_words": []}  # تهيئة بيانات المستخدم
+    user_data[user_id] = {"memorized_words": [], "points": 0}  # تهيئة بيانات المستخدم
 
     # تأكد من وجود job_queue
     if context.job_queue:
@@ -74,13 +71,14 @@ async def start(update: Update, context: CallbackContext):
         "مرحبًا بك في بوت رمضان! هنا يمكنك:\n"
         "- الحصول على فوائد يومية.\n"
         "- حفظ الكلمات العلية.\n"
-        "- تذكير يومي بأوقات الصلاة.\n\n"
+        "- اختبار حفظك باستخدام 'اكمل الفراغ'.\n\n"
         "اختر من القائمة أدناه:"
     )
 
     keyboard = [
         [InlineKeyboardButton("🌙 اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
         [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
@@ -144,10 +142,10 @@ async def word_count(update: Update, context: CallbackContext):
     # حفظ الكلمات التي تم إرسالها
     user_data[user_id]["memorized_words"].extend(words_to_send)
 
-    # إرسال الكلمات للمستخدم
+    # إرسال الكلمات مع زر تأكيد الحفظ
     words_text = "\n\n".join(words_to_send)
     keyboard = [
-        [InlineKeyboardButton("✅ تم الحفظ", callback_data="main_menu")],
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data="confirm_memorized")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -184,12 +182,42 @@ async def review_words(update: Update, context: CallbackContext):
 
     return MAIN_MENU
 
+# معالجة اختيار اختبار "اكمل الفراغ"
+async def complete_gap(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+
+    # اختيار جملة ناقصة عشوائية
+    gap_sentence = random.choice(GAP_SENTENCES)
+    context.user_data["current_gap"] = gap_sentence
+
+    await update.callback_query.edit_message_text(
+        f"📝 *اكمل الفراغ* 📝\n\n{gap_sentence['sentence']}"
+    )
+    return COMPLETE_GAP
+
+# معالجة إجابة المستخدم على "اكمل الفراغ"
+async def handle_gap_answer(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user_answer = update.message.text.strip()
+    gap_sentence = context.user_data.get("current_gap")
+
+    if gap_sentence and user_answer.lower() == gap_sentence["answer"].lower():
+        # إضافة نقاط للمستخدم
+        user_data[user_id]["points"] += 10
+        await update.message.reply_text(f"✅ إجابة صحيحة! نقاطك الآن: {user_data[user_id]['points']}")
+    else:
+        await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
+
+    return MAIN_MENU
+
 # الرجوع للقائمة الرئيسية
 async def main_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     keyboard = [
         [InlineKeyboardButton("🌙 اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
         [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -210,6 +238,7 @@ def main():
             MAIN_MENU: [
                 CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
                 CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
+                CallbackQueryHandler(complete_gap, pattern="^complete_gap$"),
                 CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
             WORD_COUNT: [
@@ -218,6 +247,9 @@ def main():
             ],
             REVIEW_WORDS: [
                 CallbackQueryHandler(review_words, pattern="^review_words$"),
+            ],
+            COMPLETE_GAP: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gap_answer),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
