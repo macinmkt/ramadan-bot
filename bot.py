@@ -17,7 +17,7 @@ if not TOKEN:
     raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
 
 # حالات المحادثة
-MAIN_MENU, SECTION_MENU, WORD_DISPLAY, TEST_SECTION, FINAL_TEST = range(5)
+MAIN_MENU, DAILY_FAIDAH, MEMORIZE_WORDS, SECTION_MENU, WORD_DISPLAY, TEST_SECTION, FINAL_TEST = range(7)
 
 # قائمة الكلمات لكل قسم
 WORDS = {
@@ -83,44 +83,60 @@ async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_data[user_id] = {"memorized_words": [], "points": 0, "sections_completed": []}  # تهيئة بيانات المستخدم
 
-    # زر البدء
-    keyboard = [[InlineKeyboardButton("🌟 البدء 🌟", callback_data="main_menu")]]
+    # رسالة ترحيبية
+    welcome_message = (
+        "🌙 *رمضان كريم* 🌙\n\n"
+        "مرحبًا بك في بوت رمضان! هنا يمكنك:\n"
+        "- الحصول على فوائد يومية.\n"
+        "- حفظ الكلمات العلية.\n"
+        "- اختبار حفظك باستخدام 'اكمل الفراغ'.\n\n"
+        "اختر من القائمة أدناه:"
+    )
+
+    keyboard = [
+        [InlineKeyboardButton("🌙 اشترك في باقة الفوائد اليومية", callback_data="daily_faidah")],
+        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(
-        "🌙 *مرحبًا بك في بوت حفظ الكلمات العلية* 🌙\n\n"
-        "اضغط على الزر أدناه للبدء:",
+    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
+    return MAIN_MENU
+
+# معالجة اختيار باقة الفوائد اليومية
+async def daily_faidah(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    keyboard = [[InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        "🌟 *تم الاشتراك في باقة الفوائد اليومية* 🌟\n\n"
+        "سيتم إرسال فوائد خلال اليوم والليلة. تقبل الله طاعاتكم!",
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
     return MAIN_MENU
 
-# القائمة الرئيسية
-async def main_menu(update: Update, context: CallbackContext):
+# معالجة اختيار برنامج حفظ الكلمات العلية
+async def memorize_words(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     user_id = update.callback_query.from_user.id
 
-    # التحقق من إكمال الأقسام الثلاثة
-    sections_completed = user_data[user_id].get("sections_completed", [])
-    if len(sections_completed) == 3:
-        keyboard = [
-            [InlineKeyboardButton("📝 الاختبار الشامل", callback_data="final_test")],
-        ]
-    else:
-        keyboard = [
-            [InlineKeyboardButton("📖 القسم الأول", callback_data="section_1")],
-            [InlineKeyboardButton("📖 القسم الثاني", callback_data="section_2")],
-            [InlineKeyboardButton("📖 القسم الثالث", callback_data="section_3")],
-        ]
-
+    # عرض الأقسام الثلاثة
+    keyboard = [
+        [InlineKeyboardButton("📖 القسم الأول", callback_data="section_1")],
+        [InlineKeyboardButton("📖 القسم الثاني", callback_data="section_2")],
+        [InlineKeyboardButton("📖 القسم الثالث", callback_data="section_3")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        "🌙 *اختر القسم* 🌙",
+        "🌙 *برنامج حفظ الكلمات العلية* 🌙\n\n"
+        "اختر القسم الذي تريد البدء به:",
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
     return SECTION_MENU
 
-# قائمة الأقسام
+# معالجة اختيار القسم
 async def section_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     section = update.callback_query.data
@@ -132,13 +148,11 @@ async def section_menu(update: Update, context: CallbackContext):
         context.user_data["current_section"] = "القسم الثاني"
     elif section == "section_3":
         context.user_data["current_section"] = "القسم الثالث"
-    elif section == "final_test":
-        return await final_test(update, context)
 
     keyboard = [
         [InlineKeyboardButton("📜 عرض الكلمات", callback_data="display_words")],
         [InlineKeyboardButton("📝 اختبار حفظك", callback_data="test_section")],
-        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -278,7 +292,7 @@ async def handle_final_test_answer(update: Update, context: CallbackContext):
         # حساب النتيجة النهائية
         total_points = user_data[user_id]["points"]
         if total_points >= 40:
-            await update.message.reply_text("🎉 *مبروك! لقد نجحت في الاختبار الشامل!* �", parse_mode="Markdown")
+            await update.message.reply_text("🎉 *مبروك! لقد نجحت في الاختبار الشامل!* 🎉", parse_mode="Markdown")
         else:
             await update.message.reply_text("❌ لم تحقق النسبة المطلوبة. حاول مرة أخرى!")
 
@@ -293,9 +307,17 @@ def main():
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_MENU: [
-                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
+                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
+                CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
                 CallbackQueryHandler(section_menu, pattern="^section_"),
                 CallbackQueryHandler(final_test, pattern="^final_test$"),
+            ],
+            DAILY_FAIDAH: [
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
+            ],
+            MEMORIZE_WORDS: [
+                CallbackQueryHandler(section_menu, pattern="^section_"),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
             SECTION_MENU: [
                 CallbackQueryHandler(display_words, pattern="^display_words$"),
