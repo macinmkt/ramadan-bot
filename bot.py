@@ -279,6 +279,7 @@ def main():
                 CallbackQueryHandler(select_day, pattern="^day_"),
                 CallbackQueryHandler(start_test, pattern="^(test_period|test_all)$"),
                 CallbackQueryHandler(back_to_periods, pattern="^back_to_periods$"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),  # إضافة هنا
             ],
             MEMORIZE: [
                 CallbackQueryHandler(memorize_word, pattern="^memorize_"),
