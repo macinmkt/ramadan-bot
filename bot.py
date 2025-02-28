@@ -43,7 +43,7 @@ async def start(update: Update, context: CallbackContext):
     return DAY_SELECTION
 
 async def show_days(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+    user_id = update.callback_query.from_user.id if update.callback_query else update.message.from_user.id
     words = context.user_data["current_words"]
 
     keyboard = []
@@ -64,7 +64,6 @@ async def show_days(update: Update, context: CallbackContext):
         ]
         keyboard.append([btn for btn in row if btn])
 
-    # إضافة أزرار "مراجعة" و"اختبار شامل" إذا كان هناك كلمات محفوظة
     if user_data[user_id]["memorized_words"]:
         keyboard.append([InlineKeyboardButton("📖 مراجعة", callback_data="review")])
         keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
@@ -119,7 +118,8 @@ async def memorize_word(update: Update, context: CallbackContext):
     if word not in user_data[user_id]["memorized_words"]:
         user_data[user_id]["memorized_words"].append(word)
 
-    await show_days(update, context)  # الرجوع مباشرة إلى قائمة الأيام
+    await update.callback_query.edit_message_text("✅ *تم الحفظ!*", parse_mode="Markdown")
+    await show_days(update, context)  # عرض قائمة الأيام مباشرة
     return DAY_SELECTION
 
 # مراجعة الكلمات المحفوظة
@@ -220,7 +220,7 @@ async def continue_test(update: Update, context: CallbackContext):
 # الرجوع لاختيار اليوم
 async def back_to_days(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    await show_days(update, context)
+    await show_days(update, context)  # عرض قائمة الأيام مباشرة
     return DAY_SELECTION
 
 # معالجة الكتابة العشوائية
@@ -228,7 +228,6 @@ async def handle_text(update: Update, context: CallbackContext):
     current_state = context.user_data.get("state", DAY_SELECTION)
     if current_state != TEST:
         await update.message.reply_text("يرجى الاختيار من القائمة!", parse_mode="Markdown")
-    # إذا كان في حالة TEST، يتم التعامل مع النص في handle_test_answer
 
 # إعداد البوت وتشغيله
 def main():
