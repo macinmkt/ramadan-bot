@@ -69,7 +69,7 @@ async def start(update: Update, context: CallbackContext):
         user_data[user_id] = {"memorized_words": []}
 
     context.user_data.clear()
-    context.user_data["current_words"] = FULL_WORDS  # استخدام النصوص الكاملة
+    context.user_data["current_words"] = FULL_WORDS
     await show_days(update, context)
     return DAY_SELECTION
 
@@ -119,7 +119,7 @@ async def select_day(update: Update, context: CallbackContext):
     user_id = update.callback_query.from_user.id
     day_index = int(update.callback_query.data.split("_")[1])
     words = context.user_data["current_words"]
-    word = words[day_index]  # النص الكامل مع "قال مولانا..."
+    word = words[day_index]
 
     if word in user_data[user_id]["memorized_words"]:
         keyboard = [
@@ -190,39 +190,42 @@ async def start_test(update: Update, context: CallbackContext):
 
     # استخراج الكلمات الأساسية (بعد "العلي:") للاختبار
     context.user_data["test_words"] = [word.split(BASE_TEXT)[1].strip() for word in memorized]
-    context.user_data["current_score"] = 0
-    context.user_data["current_question_index"] = 0
-
+    context.user_data["last_question"] = None  # لتتبع السؤال السابق
     await ask_next_question(update, context)
     return TEST
 
 async def ask_next_question(update: Update, context: CallbackContext):
     words = context.user_data["test_words"]
-    index = context.user_data["current_question_index"]
+    last_question = context.user_data.get("last_question")
 
-    if index >= min(5, len(words)):  # حد 5 أسئلة
-        score = context.user_data["current_score"]
-        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
-        await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
-            f"🏆 *انتهت رحلة الاختبار!* درجاتك: {score} من {min(5, len(words))}",
-            reply_markup=InlineKeyboardMarkup(keyboard),
-            parse_mode="Markdown",
-        )
-        return DAY_SELECTION
-
+    # اختيار كلمة جديدة عشوائيًا مع التأكد من عدم تكرار السؤال السابق إذا أمكن
     word_phrase = random.choice(words)
+    while words and len(words) > 1 and last_question and last_question["q"].split(" ")[0] in word_phrase:
+        word_phrase = random.choice(words)  # تنويع الكلمات إذا أمكن
+
     word_parts = word_phrase.split()
-    blank_pos = random.randint(0, len(word_parts) - 1)
-    correct_answer = word_parts[blank_pos]
-    word_parts[blank_pos] = "ـــــــ"
-    question = " ".join(word_parts)
+    if len(word_parts) < 2:
+        question = word_phrase  # إذا كانت كلمة واحدة فقط (نادر)
+        correct_answer = word_phrase
+    else:
+        # اختيار موقع الفراغ عشوائيًا مع التأكد من أنه مختلف عن السابق إذا أمكن
+        blank_pos = random.randint(0, len(word_parts) - 1)
+        if last_question and len(words) >= 1:
+            last_blank_pos = last_question["q"].split().index("ـــــــ")
+            while blank_pos == last_blank_pos and len(word_parts) > 1:
+                blank_pos = random.randint(0, len(word_parts) - 1)
+
+        correct_answer = word_parts[blank_pos]
+        word_parts[blank_pos] = "ـــــــ"
+        question = " ".join(word_parts)
 
     context.user_data["current_question"] = {"q": question, "a": correct_answer}
+    context.user_data["last_question"] = {"q": question, "a": correct_answer}  # تخزين السؤال الحالي كآخر سؤال
+
     await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
         f"📝 *املأ الفراغ:*\n\n{question}",
         parse_mode="Markdown",
     )
-    context.user_data["current_question_index"] += 1
 
 async def handle_test_answer(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
@@ -236,8 +239,7 @@ async def handle_test_answer(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if user_answer.lower() == question["a"].lower():
-        context.user_data["current_score"] += 1
-        result = "✅ *إجابة صحيحة! تألقتَ 🌟*\n\n" + f"الإجابة: {question['a']}"
+        result = "✅ *إجابة صحيحة!*\n\n" + f"الإجابة: {question['a']}"
     else:
         result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {question['a']}"
 
@@ -259,7 +261,7 @@ async def back_to_days(update: Update, context: CallbackContext):
 async def handle_text(update: Update, context: CallbackContext):
     current_state = context.user_data.get("state", DAY_SELECTION)
     if current_state != TEST:
-        await show_days(update, context)  # إعادة المستخدم للقائمة الرئيسية مباشرة
+        await show_days(update, context)
         return DAY_SELECTION
 
 # إعداد البوت وتشغيله
