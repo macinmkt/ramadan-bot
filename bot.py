@@ -181,7 +181,7 @@ async def ask_next_question(update: Update, context: CallbackContext):
     word_parts = word_phrase.split()
     blank_pos = random.randint(0, len(word_parts) - 1)
     correct_answer = word_parts[blank_pos]
-    word_parts[blank_pos] = "______"
+    word_parts[blank_pos] = "ـــــــ"
     question = " ".join(word_parts)
 
     context.user_data["current_question"] = {"q": question, "a": correct_answer}
