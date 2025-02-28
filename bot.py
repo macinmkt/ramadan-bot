@@ -140,4 +140,158 @@ async def select_day(update: Update, context: CallbackContext):
     return MEMORIZE
 
 # معالجة الحفظ
-async def memorize
+async def memorize_word(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    day_index = int(update.callback_query.data.split("_")[1])
+    word = context.user_data["current_words"][day_index]
+
+    if word not in user_data[user_id]["memorized_words"]:
+        user_data[user_id]["memorized_words"].append(word)
+
+    await update.callback_query.edit_message_text("✅ *تم الحفظ بنجاح!*", parse_mode="Markdown")
+    await show_days(update, context)
+    return DAY_SELECTION
+
+# مراجعة الكلمات المحفوظة
+async def review(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    memorized = user_data[user_id]["memorized_words"]
+
+    if not memorized:
+        await update.callback_query.edit_message_text(
+            "📖 *لم تضف كلمات إلى كنزك بعد!*",
+            parse_mode="Markdown"
+        )
+    else:
+        review_text = "📖 *كنوزك المحفوظة:*\n\n" + "\n".join(memorized)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            review_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown"
+        )
+    return DAY_SELECTION
+
+# اختبار شامل
+async def start_test(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    memorized = user_data[user_id]["memorized_words"]
+
+    if not memorized:
+        await update.callback_query.edit_message_text(
+            "📚 *لا كلمات محفوظة لاختبارها بعد!*",
+            parse_mode="Markdown"
+        )
+        return DAY_SELECTION
+
+    context.user_data["test_words"] = [word.split(BASE_TEXT)[1].strip() for word in memorized]
+    context.user_data["last_question"] = None
+    await ask_next_question(update, context)
+    return TEST
+
+async def ask_next_question(update: Update, context: CallbackContext):
+    words = context.user_data["test_words"]
+    last_question = context.user_data.get("last_question")
+
+    word_phrase = random.choice(words)
+    while words and len(words) > 1 and last_question and last_question["q"].split(" ")[0] in word_phrase:
+        word_phrase = random.choice(words)
+
+    word_parts = word_phrase.split()
+    if len(word_parts) < 2:
+        question = word_phrase
+        correct_answer = word_phrase
+    else:
+        blank_pos = random.randint(0, len(word_parts) - 1)
+        if last_question and len(words) >= 1:
+            last_blank_pos = last_question["q"].split().index("ـــــــ")
+            while blank_pos == last_blank_pos and len(word_parts) > 1:
+                blank_pos = random.randint(0, len(word_parts) - 1)
+
+        correct_answer = word_parts[blank_pos]
+        word_parts[blank_pos] = "ـــــــ"
+        question = " ".join(word_parts)
+
+    context.user_data["current_question"] = {"q": question, "a": correct_answer}
+    context.user_data["last_question"] = {"q": question, "a": correct_answer}
+
+    await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
+        f"📝 *املأ الفراغ:*\n\n{question}",
+        parse_mode="Markdown",
+    )
+
+async def handle_test_answer(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user_answer = update.message.text.strip()
+    question = context.user_data["current_question"]
+
+    keyboard = [
+        [InlineKeyboardButton("➡️ سؤال آخر", callback_data="next_question")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if user_answer.lower() == question["a"].lower():
+        result = "✅ *إجابة صحيحة!*\n\n" + f"الإجابة: {question['a']}"
+    else:
+        result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {question['a']}"
+
+    await update.message.reply_text(result, reply_markup=reply_markup, parse_mode="Markdown")
+    return TEST
+
+async def next_question(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    await ask_next_question(update, context)
+    return TEST
+
+# الرجوع لاختيار اليوم
+async def back_to_days(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    await show_days(update, context)
+    return DAY_SELECTION
+
+# معالجة الكتابة العشوائية وإعادة المستخدم للقائمة الرئيسية
+async def handle_text(update: Update, context: CallbackContext):
+    current_state = context.user_data.get("state", DAY_SELECTION)
+    if current_state != TEST:
+        await show_days(update, context)
+        return DAY_SELECTION
+
+# إعداد البوت وتشغيله
+def main():
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            DAY_SELECTION: [
+                CallbackQueryHandler(select_day, pattern="^day_"),
+                CallbackQueryHandler(review, pattern="^review$"),
+                CallbackQueryHandler(start_test, pattern="^test_all$"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
+            ],
+            MEMORIZE: [
+                CallbackQueryHandler(memorize_word, pattern="^memorize_"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
+            ],
+            TEST: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_test_answer),
+                CallbackQueryHandler(next_question, pattern="^next_question$"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
+            ],
+        },
+        fallbacks=[
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
+            CommandHandler("start", start),
+        ],
+    )
+
+    app.add_handler(conv_handler)
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
