@@ -19,15 +19,45 @@ if not TOKEN:
 # حالات المحادثة
 DAY_SELECTION, MEMORIZE, TEST = range(3)
 
-# قائمة الكلمات لـ 30 يومًا
+# النص الأساسي الذي يبدأ به كل يوم
+BASE_TEXT = "قال مولانا شمس الزمان الإمام طارق بن محمد السعدي قدس الله سره العلي:"
+
+# قائمة الكلمات لـ 30 يومًا (الجزء بعد "العلي:" فقط)
 WORDS = [
-    "الصبر مفتاح الفرج", "الصوم جنة", "القرآن هدى", "الصدقة تطفئ الغضب", "الصلاة نور",
-    "الذكر راحة", "التوبة مغفرة", "الدعاء عبادة", "الإخلاص سر النجاح", "رمضان فرصة",
-    "التقوى زاد", "الصمت حكمة", "القلب مرآة", "الجار حق", "الأمل قوة",
-    "الرضا كنز", "العمل صلاح", "الشكر نعمة", "العدل أساس", "التوكل يقين",
-    "ليلة القدر خير", "العتق من النار", "الاجتهاد فضيلة", "التهجد قربة", "الاستغفار مفتاح",
-    "القيام بركة", "الإنفاق ثواب", "الخشوع راحة", "العيد فرحة", "رمضان وداع",
+    "مقدار رحمة البرية بقدر ما في قلوبهم من المحبة الحية",
+    "الصبر مفتاح كل خير",
+    "القرآن نور القلوب",
+    "الصدقة باب الرحمة",
+    "الصلاة عماد الدين",
+    "الذكر غذاء الروح",
+    "التوبة طريق النجاة",
+    "الدعاء سلاح المؤمن",
+    "الإخلاص جوهر العمل",
+    "رمضان مدرسة التقوى",
+    "التقوى زينة العبد",
+    "الصمت كنز الحكمة",
+    "القلب وعاء الإيمان",
+    "الجار مرآة الأخلاق",
+    "الأمل شعاع الحياة",
+    "الرضا باب السعادة",
+    "العمل مفتاح الجنة",
+    "الشكر زيادة النعم",
+    "العدل أساس الملك",
+    "التوكل درع المؤمن",
+    "ليلة القدر جوهرة الزمان",
+    "العتق من النار غاية الصائم",
+    "الاجتهاد سبيل العزة",
+    "التهجد نور الليل",
+    "الاستغفار مفتاح الفرج",
+    "القيام ليلة الإسراء",
+    "الإنفاق في سبيل الله",
+    "الخشوع روح الصلاة",
+    "العيد بهجة الطاعة",
+    "رمضان وداع الأرواح",
 ]
+
+# دمج النص الأساسي مع الكلمات لعرضها عند اختيار اليوم
+FULL_WORDS = [f"{BASE_TEXT} {word}" for word in WORDS]
 
 # حفظ بيانات المستخدم
 user_data = {}
@@ -39,7 +69,7 @@ async def start(update: Update, context: CallbackContext):
         user_data[user_id] = {"memorized_words": []}
 
     context.user_data.clear()
-    context.user_data["current_words"] = WORDS
+    context.user_data["current_words"] = FULL_WORDS  # استخدام النصوص الكاملة
     await show_days(update, context)
     return DAY_SELECTION
 
@@ -89,7 +119,7 @@ async def select_day(update: Update, context: CallbackContext):
     user_id = update.callback_query.from_user.id
     day_index = int(update.callback_query.data.split("_")[1])
     words = context.user_data["current_words"]
-    word = words[day_index]
+    word = words[day_index]  # النص الكامل مع "قال مولانا..."
 
     if word in user_data[user_id]["memorized_words"]:
         keyboard = [
@@ -158,7 +188,8 @@ async def start_test(update: Update, context: CallbackContext):
         )
         return DAY_SELECTION
 
-    context.user_data["test_words"] = memorized.copy()
+    # استخراج الكلمات الأساسية (بعد "العلي:") للاختبار
+    context.user_data["test_words"] = [word.split(BASE_TEXT)[1].strip() for word in memorized]
     context.user_data["current_score"] = 0
     context.user_data["current_question_index"] = 0
 
@@ -230,7 +261,6 @@ async def handle_text(update: Update, context: CallbackContext):
     if current_state != TEST:
         await show_days(update, context)  # إعادة المستخدم للقائمة الرئيسية مباشرة
         return DAY_SELECTION
-    # إذا كان في حالة TEST، سيتم التعامل مع النص كإجابة عادية
 
 # إعداد البوت وتشغيله
 def main():
