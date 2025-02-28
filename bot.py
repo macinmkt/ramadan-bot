@@ -236,9 +236,6 @@ async def handle_text(update: Update, context: CallbackContext):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # معالج منفصل للأمر /start لضمان إعادة البدء
-    app.add_handler(CommandHandler("start", start), group=1)
-
     # معالج المحادثة
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
@@ -261,11 +258,11 @@ def main():
         },
         fallbacks=[
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
-            CommandHandler("start", start),  # إضافة /start كـ fallback
+            CommandHandler("start", start),  # إضافة /start كـ fallback لإعادة البدء
         ],
     )
 
-    app.add_handler(conv_handler, group=0)
+    app.add_handler(conv_handler)
     app.run_polling()
 
 if __name__ == "__main__":
