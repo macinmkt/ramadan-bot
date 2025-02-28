@@ -35,9 +35,12 @@ user_data = {}
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
+    # إعادة تهيئة بيانات المستخدم إذا لزم الأمر
     if user_id not in user_data:
         user_data[user_id] = {"memorized_words": []}
 
+    # إعادة تعيين البيانات المؤقتة في context
+    context.user_data.clear()  # مسح أي بيانات سابقة
     context.user_data["current_words"] = WORDS
     await show_days(update, context)
     return DAY_SELECTION
@@ -233,6 +236,10 @@ async def handle_text(update: Update, context: CallbackContext):
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
+    # معالج منفصل للأمر /start لضمان إعادة البدء
+    app.add_handler(CommandHandler("start", start), group=1)
+
+    # معالج المحادثة
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -252,10 +259,13 @@ def main():
                 CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
             ],
         },
-        fallbacks=[MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text)],
+        fallbacks=[
+            MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
+            CommandHandler("start", start),  # إضافة /start كـ fallback
+        ],
     )
 
-    app.add_handler(conv_handler)
+    app.add_handler(conv_handler, group=0)
     app.run_polling()
 
 if __name__ == "__main__":
