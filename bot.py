@@ -61,15 +61,15 @@ async def start(update: Update, context: CallbackContext):
     welcome_message = (
         "🌙 *رمضان كريم* 🌙\n\n"
         "مرحبًا بك في بوت رمضان! هنا يمكنك:\n"
-        "- الحصول على فوائد متنوعة.\n"
         "- حفظ الكلمات العلية.\n"
+        "- الحصول على فوائد متنوعة.\n"
         "- اختبار حفظك باستخدام 'اكمل الفراغ'.\n\n"
         "اختر من القائمة أدناه:"
     )
 
     keyboard = [
-        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
         [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
         [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -227,8 +227,8 @@ async def handle_gap_answer(update: Update, context: CallbackContext):
 async def main_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     keyboard = [
-        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
         [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
         [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
