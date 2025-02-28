@@ -44,7 +44,13 @@ async def start(update: Update, context: CallbackContext):
     if user_id not in user_data:
         user_data[user_id] = {"memorized_words": [], "points": 0}
 
-    welcome_message = "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\nاختر فترة من رمضان:"
+    welcome_message = (
+        "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\n"
+        "حفظ كلمة علية يوميًا من كلمات مولانا الإمام شمس الزمان طارق بن محمد السعدي  \n"
+        "قدَّس الله تعالى سرَّه العلي  \n"
+        "مع جمع النقاط عند إتمام الحفظ، وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
+        "اختر فترة من رمضان:"
+    )
 
     keyboard = [
         [InlineKeyboardButton("العشر الأوائل من رمضان", callback_data="first_ten")],
@@ -219,7 +225,13 @@ async def continue_test(update: Update, context: CallbackContext):
 # الرجوع لاختيار الفترة
 async def back_to_periods(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    welcome_message = "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\nاختر فترة من رمضان:"
+    welcome_message = (
+        "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\n"
+        "حفظ كلمة علية يوميًا من كلمات مولانا الإمام شمس الزمان طارق بن محمد السعدي  \n"
+        "قدَّس الله تعالى سرَّه العلي  \n"
+        "مع جمع النقاط عند إتمام الحفظ، وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
+        "اختر فترة من رمضان:"
+    )
     keyboard = [
         [InlineKeyboardButton("العشر الأوائل من رمضان", callback_data="first_ten")],
         [InlineKeyboardButton("العشر الوسطى من رمضان", callback_data="middle_ten")],
@@ -279,7 +291,7 @@ def main():
                 CallbackQueryHandler(select_day, pattern="^day_"),
                 CallbackQueryHandler(start_test, pattern="^(test_period|test_all)$"),
                 CallbackQueryHandler(back_to_periods, pattern="^back_to_periods$"),
-                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),  # إضافة هنا
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
             ],
             MEMORIZE: [
                 CallbackQueryHandler(memorize_word, pattern="^memorize_"),
