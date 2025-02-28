@@ -35,12 +35,10 @@ user_data = {}
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    # إعادة تهيئة بيانات المستخدم إذا لزم الأمر
     if user_id not in user_data:
         user_data[user_id] = {"memorized_words": []}
 
-    # إعادة تعيين البيانات المؤقتة في context
-    context.user_data.clear()  # مسح أي بيانات سابقة
+    context.user_data.clear()
     context.user_data["current_words"] = WORDS
     await show_days(update, context)
     return DAY_SELECTION
@@ -50,7 +48,7 @@ async def show_days(update: Update, context: CallbackContext):
     words = context.user_data["current_words"]
 
     keyboard = []
-    for i in range(0, 30, 3):  # عرض 3 أيام في كل صف
+    for i in range(0, 30, 3):
         row = [
             InlineKeyboardButton(
                 f"اليوم {i+1}{' ✅' if words[i] in user_data[user_id]['memorized_words'] else ''}",
@@ -73,11 +71,9 @@ async def show_days(update: Update, context: CallbackContext):
 
     reply_markup = InlineKeyboardMarkup(keyboard)
     message = (
-        "🌙 *برنامج حفظ الكلمات العلية في شهر رمضان* 🌙\n\n"
-        "حفظ كلمة علية يوميًا من كلمات مولانا الإمام شمس الزمان طارق بن محمد السعدي  \n"
-        "قدَّس الله تعالى سرَّه العلي  \n"
-        "وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
-        "اختر يومًا:"
+        "🌙 *رحلة حفظ الكلمات العلية في رمضان المبارك* 🌙\n\n"
+        "انطلق في مغامرة يومية مع كلمات الحكمة في شهر الخير، اختر يومك المفضل، واضغط 'تم الحفظ' لتخزينها في قلبك. "
+        "استمتع بمراجعة كنوزك المحفوظة بضغطة زر، أو تحدَّ نفسك باختبار شامل يضيء درب معرفتك!"
     )
     if update.callback_query:
         await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
@@ -95,12 +91,12 @@ async def select_day(update: Update, context: CallbackContext):
 
     if word in user_data[user_id]["memorized_words"]:
         keyboard = [
-            [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
         ]
     else:
         keyboard = [
             [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"memorize_{day_index}")],
-            [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
+            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -121,8 +117,8 @@ async def memorize_word(update: Update, context: CallbackContext):
     if word not in user_data[user_id]["memorized_words"]:
         user_data[user_id]["memorized_words"].append(word)
 
-    await update.callback_query.edit_message_text("✅ *تم الحفظ!*", parse_mode="Markdown")
-    await show_days(update, context)  # عرض قائمة الأيام مباشرة
+    await update.callback_query.edit_message_text("✅ *تم الحفظ بنجاح!*", parse_mode="Markdown")
+    await show_days(update, context)
     return DAY_SELECTION
 
 # مراجعة الكلمات المحفوظة
@@ -133,12 +129,12 @@ async def review(update: Update, context: CallbackContext):
 
     if not memorized:
         await update.callback_query.edit_message_text(
-            "📖 *لا توجد كلمات محفوظة بعد!*",
+            "📖 *لم تضف كلمات إلى كنزك بعد!*",
             parse_mode="Markdown"
         )
     else:
-        review_text = "📖 *الكلمات المحفوظة:*\n\n" + "\n".join(memorized)
-        keyboard = [[InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")]]
+        review_text = "📖 *كنوزك المحفوظة:*\n\n" + "\n".join(memorized)
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
             review_text,
@@ -155,7 +151,7 @@ async def start_test(update: Update, context: CallbackContext):
 
     if not memorized:
         await update.callback_query.edit_message_text(
-            "📚 *لا توجد كلمات محفوظة للاختبار!*",
+            "📚 *لا كلمات محفوظة لاختبارها بعد!*",
             parse_mode="Markdown"
         )
         return DAY_SELECTION
@@ -171,11 +167,11 @@ async def ask_next_question(update: Update, context: CallbackContext):
     words = context.user_data["test_words"]
     index = context.user_data["current_question_index"]
 
-    if index >= min(5, len(words)):  # حد 5 أسئلة أو عدد الكلمات المحفوظة
+    if index >= min(5, len(words)):  # حد 5 أسئلة
         score = context.user_data["current_score"]
-        keyboard = [[InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")]]
+        keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
         await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
-            f"🏆 *انتهى الاختبار!* درجاتك: {score}/{min(5, len(words))}",
+            f"🏆 *انتهت رحلة الاختبار!* درجاتك: {score} من {min(5, len(words))}",
             reply_markup=InlineKeyboardMarkup(keyboard),
             parse_mode="Markdown",
         )
@@ -190,7 +186,7 @@ async def ask_next_question(update: Update, context: CallbackContext):
 
     context.user_data["current_question"] = {"q": question, "a": correct_answer}
     await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
-        f"📝 *املأ الفراغ ({index + 1}/{min(5, len(words))})*:\n\n{question}",
+        f"📝 *املأ الفراغ:*\n\n{question}",
         parse_mode="Markdown",
     )
     context.user_data["current_question_index"] += 1
@@ -201,21 +197,21 @@ async def handle_test_answer(update: Update, context: CallbackContext):
     question = context.user_data["current_question"]
 
     keyboard = [
-        [InlineKeyboardButton("➡️ استمرار", callback_data="continue_test")],
-        [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
+        [InlineKeyboardButton("➡️ سؤال آخر", callback_data="next_question")],
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if user_answer.lower() == question["a"].lower():
         context.user_data["current_score"] += 1
-        result = "✅ *إجابة صحيحة! رائع جدًا 🌟*"
+        result = "✅ *إجابة صحيحة! تألقتَ 🌟*\n\n" + f"الإجابة: {question['a']}"
     else:
         result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {question['a']}"
 
     await update.message.reply_text(result, reply_markup=reply_markup, parse_mode="Markdown")
     return TEST
 
-async def continue_test(update: Update, context: CallbackContext):
+async def next_question(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     await ask_next_question(update, context)
     return TEST
@@ -223,20 +219,19 @@ async def continue_test(update: Update, context: CallbackContext):
 # الرجوع لاختيار اليوم
 async def back_to_days(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    await show_days(update, context)  # عرض قائمة الأيام مباشرة
+    await show_days(update, context)
     return DAY_SELECTION
 
 # معالجة الكتابة العشوائية
 async def handle_text(update: Update, context: CallbackContext):
     current_state = context.user_data.get("state", DAY_SELECTION)
     if current_state != TEST:
-        await update.message.reply_text("يرجى الاختيار من القائمة!", parse_mode="Markdown")
+        await update.message.reply_text("اختر من القائمة فقط!", parse_mode="Markdown")
 
 # إعداد البوت وتشغيله
 def main():
     app = ApplicationBuilder().token(TOKEN).build()
 
-    # معالج المحادثة
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
@@ -252,13 +247,13 @@ def main():
             ],
             TEST: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_test_answer),
-                CallbackQueryHandler(continue_test, pattern="^continue_test$"),
+                CallbackQueryHandler(next_question, pattern="^next_question$"),
                 CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
             ],
         },
         fallbacks=[
             MessageHandler(filters.TEXT & ~filters.COMMAND, handle_text),
-            CommandHandler("start", start),  # إضافة /start كـ fallback لإعادة البدء
+            CommandHandler("start", start),
         ],
     )
 
