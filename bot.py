@@ -42,13 +42,13 @@ user_data = {}
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     if user_id not in user_data:
-        user_data[user_id] = {"memorized_words": [], "points": 0}
+        user_data[user_id] = {"memorized_words": []}  # حذف "points"
 
     welcome_message = (
-        "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\n"
+        "🌙 *برنامج حفظ الكلمات العلية في شهر رمضان* 🌙\n\n"
         "حفظ كلمة علية يوميًا من كلمات مولانا الإمام شمس الزمان طارق بن محمد السعدي  \n"
         "قدَّس الله تعالى سرَّه العلي  \n"
-        "مع جمع النقاط عند إتمام الحفظ، وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
+        "وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
         "اختر فترة من رمضان:"
     )
 
@@ -138,14 +138,13 @@ async def memorize_word(update: Update, context: CallbackContext):
 
     if word not in user_data[user_id]["memorized_words"]:
         user_data[user_id]["memorized_words"].append(word)
-        user_data[user_id]["points"] += 10
 
     keyboard = [
         [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        f"✅ *تم الحفظ!* نقاطك الآن: {user_data[user_id]['points']}",
+        "✅ *تم الحفظ!*",  # حذف "نقاطك الآن"
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
@@ -226,10 +225,10 @@ async def continue_test(update: Update, context: CallbackContext):
 async def back_to_periods(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     welcome_message = (
-        "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\n"
+        "🌙 *برنامج حفظ الكلمات العلية في شهر رمضان* 🌙\n\n"
         "حفظ كلمة علية يوميًا من كلمات مولانا الإمام شمس الزمان طارق بن محمد السعدي  \n"
         "قدَّس الله تعالى سرَّه العلي  \n"
-        "مع جمع النقاط عند إتمام الحفظ، وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
+        "وبعد اكتمال كل قسم من أقسام رمضان يمكنك خوض الاختبار!\n\n"
         "اختر فترة من رمضان:"
     )
     keyboard = [
