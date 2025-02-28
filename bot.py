@@ -10,7 +10,6 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
-from datetime import time, datetime, timedelta
 
 # جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
@@ -18,218 +17,241 @@ if not TOKEN:
     raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
 
 # حالات المحادثة
-MAIN_MENU, WORD_COUNT, REVIEW_WORDS, COMPLETE_GAP = range(4)
+MAIN_MENU, PERIOD_SELECTION, DAY_SELECTION, MEMORIZE, TEST = range(5)
 
-# قائمة الكلمات
-WORDS = [
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
-    "هذا النص هو مثال لنص يمكن أن يستبدل في نفس المساحة، لقد تم توليد هذا النص من مولد النص العربى، حيث",
+# قوائم الكلمات لكل فترة
+WORDS_FIRST_TEN = [
+    "الصبر مفتاح الفرج",           # اليوم 1
+    "الصوم جنة",                   # اليوم 2
+    "القرآن هدى",                  # اليوم 3
+    "الصدقة تطفئ الغضب",          # اليوم 4
+    "الصلاة نور",                  # اليوم 5
+    "الذكر راحة",                  # اليوم 6
+    "التوبة مغفرة",                # اليوم 7
+    "الدعاء عبادة",               # اليوم 8
+    "الإخلاص سر النجاح",          # اليوم 9
+    "رمضان فرصة",                 # اليوم 10
 ]
 
-# قائمة الجمل الناقصة
-GAP_SENTENCES = [
-    {"sentence": "هذا النص هو مثال لنص يمكن أن ______ في نفس المساحة.", "answer": "يستبدل"},
-    {"sentence": "لقد تم توليد هذا النص من مولد النص العربى، ______.", "answer": "حيث"},
+WORDS_MIDDLE_TEN = [
+    "التقوى زاد",                  # اليوم 11
+    "الصمت حكمة",                  # اليوم 12
+    "القلب مرآة",                  # اليوم 13
+    "الجار حق",                    # اليوم 14
+    "الأمل قوة",                   # اليوم 15
+    "الرضا كنز",                   # اليوم 16
+    "العمل صلاح",                 # اليوم 17
+    "الشكر نعمة",                  # اليوم 18
+    "العدل أساس",                 # اليوم 19
+    "التوكل يقين",                 # اليوم 20
 ]
 
-# قائمة الفوائد المتنوعة عن رمضان
-BENEFITS = [
-    "🌙 الصوم في رمضان يعلم الصبر والتحمل ويقوي الإرادة.",
-    "🌟 رمضان فرصة للتوبة والرجوع إلى الله بقلب سليم.",
-    "🕌 قيام الليل في رمضان من أفضل العبادات التي تقرب العبد إلى ربه.",
-    "📿 الصدقة في رمضان تتضاعف أجرها، فهي مغنم عظيم.",
-    "🌼 رمضان شهر القرآن، ففيه أنزل القرآن الكريم هدى للناس.",
-    "⏰ الصيام يذكرنا بنعمة الطعام والشراب التي نغفل عنها.",
-    "🌌 ليلة القدر في رمضان خير من ألف شهر، فاغتنمها.",
+WORDS_LAST_TEN = [
+    "ليلة القدر خير",              # اليوم 21
+    "العتق من النار",             # اليوم 22
+    "الاجتهاد فضيلة",             # اليوم 23
+    "التهجد قربة",                 # اليوم 24
+    "الاستغفار مفتاح",            # اليوم 25
+    "القيام بركة",                 # اليوم 26
+    "الإنفاق ثواب",               # اليوم 27
+    "الخشوع راحة",                # اليوم 28
+    "العيد فرحة",                  # اليوم 29
+    "رمضان وداع",                 # اليوم 30
 ]
 
-# حفظ الكلمات التي تم إرسالها للمستخدم
+# أسئلة الاختبار لكل فترة
+TEST_QUESTIONS = {
+    "first_ten": [
+        {"q": "ما هو مفتاح الفرج؟", "a": "الصبر"},
+        {"q": "ما الذي يطفئ الغضب؟", "a": "الصدقة"},
+        {"q": "ما هو نور المؤمن؟", "a": "الصلاة"},
+        {"q": "ما هو سر النجاح؟", "a": "الإخلاص"},
+        {"q": "ما هي فرصة رمضان؟", "a": "التوبة"},
+    ],
+    "middle_ten": [
+        {"q": "ما هو زاد المؤمن؟", "a": "التقوى"},
+        {"q": "ما هو كنز الدنيا؟", "a": "الرضا"},
+        {"q": "ما هو أساس العدل؟", "a": "العدل"},
+        {"q": "ما هي حكمة الصمت؟", "a": "الصمت"},
+        {"q": "ما هو حق الجار؟", "a": "الجار"},
+    ],
+    "last_ten": [
+        {"q": "ما هي خير من ألف شهر؟", "a": "ليلة القدر"},
+        {"q": "ما هو مفتاح الاستغفار؟", "a": "الاستغفار"},
+        {"q": "ما هي بركة القيام؟", "a": "القيام"},
+        {"q": "ما هو ثواب الإنفاق؟", "a": "الإنفاق"},
+        {"q": "ما هي فرحة العيد؟", "a": "العيد"},
+    ],
+    "all_days": [
+        {"q": "ما هو مفتاح الفرج؟", "a": "الصبر"},
+        {"q": "ما هي خير من ألف شهر؟", "a": "ليلة القدر"},
+        {"q": "ما هو زاد المؤمن؟", "a": "التقوى"},
+        {"q": "ما هو نور المؤمن؟", "a": "الصلاة"},
+        {"q": "ما هو كنز الدنيا؟", "a": "الرضا"},
+    ]
+}
+
+# حفظ بيانات المستخدم
 user_data = {}
 
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     if user_id not in user_data:
-        user_data[user_id] = {"memorized_words": [], "points": 0, "sent_benefits": []}  # تهيئة بيانات المستخدم مع قائمة الفوائد المرسلة
+        user_data[user_id] = {"memorized_words": [], "points": 0}
 
-    # رسالة ترحيبية
     welcome_message = (
         "🌙 *رمضان كريم* 🌙\n\n"
-        "مرحبًا بك في بوت رمضان! هنا يمكنك:\n"
-        "- حفظ الكلمات العلية.\n"
-        "- الحصول على فوائد متنوعة.\n"
-        "- اختبار حفظك باستخدام 'اكمل الفراغ'.\n\n"
-        "اختر من القائمة أدناه:"
+        "مرحبًا بك في بوت مسابقة حفظ الكلمات العلية! اختر من القائمة:"
     )
 
     keyboard = [
-        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
-        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
-        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
+        [InlineKeyboardButton("🕌 مسابقة حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
     return MAIN_MENU
 
-# معالجة اختيار فوائد متنوعة
-async def daily_faidah(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
-
-    # تهيئة قائمة الفوائد المرسلة إذا لم تكن موجودة
-    if "sent_benefits" not in user_data[user_id]:
-        user_data[user_id]["sent_benefits"] = []
-
-    # تصفية الفوائد غير المرسلة
-    available_benefits = [b for b in BENEFITS if b not in user_data[user_id]["sent_benefits"]]
-
-    if available_benefits:
-        # اختيار فائدة عشوائية من الفوائد المتاحة
-        selected_benefit = random.choice(available_benefits)
-        user_data[user_id]["sent_benefits"].append(selected_benefit)
-        message = f"🌟 *فائدة جديدة* 🌟\n\n{selected_benefit}"
-    else:
-        message = "🌙 *تم استلام كل الفوائد!* 🌙\n\nلقد استلمت جميع الفوائد المتاحة حاليًا، عد لاحقًا للمزيد!"
-
-    keyboard = [[InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")]]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(
-        message,
-        reply_markup=reply_markup,
-        parse_mode="Markdown",
-    )
-    return MAIN_MENU
-
-# معالجة اختيار برنامج حفظ الكلمات العلية
+# اختيار الفترة
 async def memorize_words(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
-
-    # إذا كان المستخدم قد حفظ كلمات من قبل، نعرض خيار "مراجعة الكلمات"
-    if user_data[user_id]["memorized_words"]:
-        keyboard = [
-            [InlineKeyboardButton("📖 مراجعة الكلمات", callback_data="review_words")],
-            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.callback_query.edit_message_text(
-            "لقد قمت بحفظ كلمات من قبل. اختر مراجعة الكلمات:",
-            reply_markup=reply_markup,
-        )
-        return REVIEW_WORDS
-    else:
-        # إذا لم يحفظ كلمات من قبل، نعرض خيار "كلمة واحدة" أو "كلمتين"
-        keyboard = [
-            [InlineKeyboardButton("📜 كلمة واحدة", callback_data="one_word")],
-            [InlineKeyboardButton("📜 كلمتين", callback_data="two_words")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.callback_query.edit_message_text(
-            "🌙 *كم عدد الكلمات التي تريد حفظها؟* 🌙",
-            reply_markup=reply_markup,
-            parse_mode="Markdown",
-        )
-        return WORD_COUNT
-
-# معالجة اختيار عدد الكلمات
-async def word_count(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
-    choice = update.callback_query.data
-
-    if choice == "one_word":
-        words_to_send = WORDS[:1]  # إرسال كلمة واحدة
-    else:
-        words_to_send = WORDS[:2]  # إرسال كلمتين
-
-    # حفظ الكلمات التي تم إرسالها
-    if "memorized_words" not in user_data[user_id]:
-        user_data[user_id]["memorized_words"] = []
-    user_data[user_id]["memorized_words"].extend(words_to_send)
-
-    # إرسال الكلمات مع زر تأكيد الحفظ
-    words_text = "\n\n".join(words_to_send)
     keyboard = [
-        [InlineKeyboardButton("✅ تم الحفظ", callback_data="confirm_memorized")],
+        [InlineKeyboardButton("العشر الأوائل من رمضان", callback_data="first_ten")],
+        [InlineKeyboardButton("العشر الوسطى من رمضان", callback_data="middle_ten")],
+        [InlineKeyboardButton("العشر الأواخر من رمضان", callback_data="last_ten")],
+        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
-        f"🌟 *الكلمات التي تم إرسالها* 🌟\n\n{words_text}",
+        "🌙 *اختر الفترة* 🌙",
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
-    return MAIN_MENU
+    return PERIOD_SELECTION
 
-# معالجة مراجعة الكلمات
-async def review_words(update: Update, context: CallbackContext):
+# اختيار اليوم
+async def select_period(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     user_id = update.callback_query.from_user.id
+    period = update.callback_query.data
 
-    # جلب الكلمات المحفوظة
-    memorized_words = user_data[user_id]["memorized_words"]
-    if memorized_words:
-        # تنسيق الكلمات بشكل جديد
-        words_text = "📖 *الكلمات العلية* 📖\n\n"
-        for i, word in enumerate(memorized_words, start=1):
-            words_text += f"الكلمة {i}: {word}\n\n"
+    if period == "first_ten":
+        context.user_data["current_words"] = WORDS_FIRST_TEN
+        context.user_data["test_key"] = "first_ten"
+    elif period == "middle_ten":
+        context.user_data["current_words"] = WORDS_MIDDLE_TEN
+        context.user_data["test_key"] = "middle_ten"
+    elif period == "last_ten":
+        context.user_data["current_words"] = WORDS_LAST_TEN
+        context.user_data["test_key"] = "last_ten"
 
-        keyboard = [
-            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
-        ]
-        reply_markup = InlineKeyboardMarkup(keyboard)
-        await update.callback_query.edit_message_text(
-            words_text,
+    keyboard = [
+        [InlineKeyboardButton(f"اليوم {i+1}", callback_data=f"day_{i}") for i in range(5)],
+        [InlineKeyboardButton(f"اليوم {i+6}", callback_data=f"day_{i+5}") for i in range(5)],
+    ]
+    if period == "last_ten" and len(user_data[user_id]["memorized_words"]) >= 30:
+        keyboard.append([InlineKeyboardButton("📝 اختبار العشر الأواخر", callback_data="test_period")])
+        keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
+    keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_periods")])
+    
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        f"🌟 *اختر يومًا من {period.replace('_', ' ')}* 🌟",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    return DAY_SELECTION
+
+# عرض الكلمة للحفظ
+async def select_day(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    day_index = int(update.callback_query.data.split("_")[1])
+    words = context.user_data["current_words"]
+    word = words[day_index]
+
+    keyboard = [
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"memorize_{day_index}")],
+        [InlineKeyboardButton("🔙 رجوع للخلف", callback_data="back_to_days")],
+        [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        f"📜 *اليوم {day_index + 1}*\n\n{word}",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    return MEMORIZE
+
+# معالجة الحفظ
+async def memorize_word(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    day_index = int(update.callback_query.data.split("_")[1])
+    word = context.user_data["current_words"][day_index]
+
+    if word not in user_data[user_id]["memorized_words"]:
+        user_data[user_id]["memorized_words"].append(word)
+        user_data[user_id]["points"] += 10
+
+    keyboard = [
+        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        f"✅ *تم الحفظ!* نقاطك الآن: {user_data[user_id]['points']}",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    return DAY_SELECTION
+
+# اختبار الفترة أو الشامل
+async def start_test(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    test_type = update.callback_query.data
+
+    if test_type == "test_period":
+        questions = TEST_QUESTIONS[context.user_data["test_key"]]
+    elif test_type == "test_all":
+        questions = TEST_QUESTIONS["all_days"]
+
+    question = random.choice(questions)
+    context.user_data["current_question"] = question
+
+    await update.callback_query.edit_message_text(
+        f"📝 *سؤال الاختبار* 📝\n\n{question['q']}",
+    )
+    return TEST
+
+# معالجة إجابة الاختبار
+async def handle_test_answer(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user_answer = update.message.text.strip()
+    question = context.user_data["current_question"]
+
+    keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+
+    if user_answer.lower() == question["a"].lower():
+        await update.message.reply_text(
+            "✅ *إجابة صحيحة!*",
             reply_markup=reply_markup,
             parse_mode="Markdown",
         )
     else:
-        await update.callback_query.edit_message_text("لم تقم بحفظ أي كلمات حتى الآن.")
-
-    return MAIN_MENU
-
-# معالجة اختيار اختبار "اكمل الفراغ"
-async def complete_gap(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
-
-    # اختيار جملة ناقصة عشوائية
-    gap_sentence = random.choice(GAP_SENTENCES)
-    context.user_data["current_gap"] = gap_sentence
-
-    await update.callback_query.edit_message_text(
-        f"📝 *اكمل الفراغ* 📝\n\n{gap_sentence['sentence']}"
-    )
-    return COMPLETE_GAP
-
-# معالجة إجابة المستخدم على "اكمل الفراغ"
-async def handle_gap_answer(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
-    user_answer = update.message.text.strip()
-    gap_sentence = context.user_data.get("current_gap")
-
-    if gap_sentence and user_answer.lower() == gap_sentence["answer"].lower():
-        # إضافة نقاط للمستخدم
-        if "points" not in user_data[user_id]:
-            user_data[user_id]["points"] = 0
-        user_data[user_id]["points"] += 10
-        await update.message.reply_text(f"✅ إجابة صحيحة! نقاطك الآن: {user_data[user_id]['points']}")
-    else:
-        await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
-
-    return MAIN_MENU
+        await update.message.reply_text(
+            "❌ *إجابة خاطئة!*",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+    return DAY_SELECTION
 
 # الرجوع للقائمة الرئيسية
 async def main_menu(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     keyboard = [
-        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
-        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
-        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
+        [InlineKeyboardButton("🕌 مسابقة حفظ الكلمات العلية", callback_data="memorize_words")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -239,29 +261,43 @@ async def main_menu(update: Update, context: CallbackContext):
     )
     return MAIN_MENU
 
+# الرجوع لاختيار الفترة
+async def back_to_periods(update: Update, context: CallbackContext):
+    await memorize_words(update, context)
+    return PERIOD_SELECTION
+
+# الرجوع لاختيار اليوم
+async def back_to_days(update: Update, context: CallbackContext):
+    await select_period(update, context)
+    return DAY_SELECTION
+
 # إعداد البوت وتشغيله
 def main():
-    # استخدام ApplicationBuilder لإنشاء Application مع JobQueue
     app = ApplicationBuilder().token(TOKEN).build()
 
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
             MAIN_MENU: [
-                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
                 CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
-                CallbackQueryHandler(complete_gap, pattern="^complete_gap$"),
                 CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
-            WORD_COUNT: [
-                CallbackQueryHandler(word_count, pattern="^one_word$"),
-                CallbackQueryHandler(word_count, pattern="^two_words$"),
+            PERIOD_SELECTION: [
+                CallbackQueryHandler(select_period, pattern="^(first_ten|middle_ten|last_ten)$"),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
-            REVIEW_WORDS: [
-                CallbackQueryHandler(review_words, pattern="^review_words$"),
+            DAY_SELECTION: [
+                CallbackQueryHandler(select_day, pattern="^day_"),
+                CallbackQueryHandler(start_test, pattern="^(test_period|test_all)$"),
+                CallbackQueryHandler(back_to_periods, pattern="^back_to_periods$"),
             ],
-            COMPLETE_GAP: [
-                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gap_answer),
+            MEMORIZE: [
+                CallbackQueryHandler(memorize_word, pattern="^memorize_"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
+            ],
+            TEST: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_test_answer),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
