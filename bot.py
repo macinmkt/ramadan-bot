@@ -130,4 +130,145 @@ async def memorize_words(update: Update, context: CallbackContext):
         ]
         reply_markup = InlineKeyboardMarkup(keyboard)
         await update.callback_query.edit_message_text(
-            "🌙
+            "🌙 *كم عدد الكلمات التي تريد حفظها؟* 🌙",
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+        return WORD_COUNT
+
+# معالجة اختيار عدد الكلمات
+async def word_count(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+    choice = update.callback_query.data
+
+    if choice == "one_word":
+        words_to_send = WORDS[:1]  # إرسال كلمة واحدة
+    else:
+        words_to_send = WORDS[:2]  # إرسال كلمتين
+
+    # حفظ الكلمات التي تم إرسالها
+    if "memorized_words" not in user_data[user_id]:
+        user_data[user_id]["memorized_words"] = []
+    user_data[user_id]["memorized_words"].extend(words_to_send)
+
+    # إرسال الكلمات مع زر تأكيد الحفظ
+    words_text = "\n\n".join(words_to_send)
+    keyboard = [
+        [InlineKeyboardButton("✅ تم الحفظ", callback_data="confirm_memorized")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        f"🌟 *الكلمات التي تم إرسالها* 🌟\n\n{words_text}",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    return MAIN_MENU
+
+# معالجة مراجعة الكلمات
+async def review_words(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+
+    # جلب الكلمات المحفوظة
+    memorized_words = user_data[user_id]["memorized_words"]
+    if memorized_words:
+        # تنسيق الكلمات بشكل جديد
+        words_text = "📖 *الكلمات العلية* 📖\n\n"
+        for i, word in enumerate(memorized_words, start=1):
+            words_text += f"الكلمة {i}: {word}\n\n"
+
+        keyboard = [
+            [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
+        ]
+        reply_markup = InlineKeyboardMarkup(keyboard)
+        await update.callback_query.edit_message_text(
+            words_text,
+            reply_markup=reply_markup,
+            parse_mode="Markdown",
+        )
+    else:
+        await update.callback_query.edit_message_text("لم تقم بحفظ أي كلمات حتى الآن.")
+
+    return MAIN_MENU
+
+# معالجة اختيار اختبار "اكمل الفراغ"
+async def complete_gap(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    user_id = update.callback_query.from_user.id
+
+    # اختيار جملة ناقصة عشوائية
+    gap_sentence = random.choice(GAP_SENTENCES)
+    context.user_data["current_gap"] = gap_sentence
+
+    await update.callback_query.edit_message_text(
+        f"📝 *اكمل الفراغ* 📝\n\n{gap_sentence['sentence']}"
+    )
+    return COMPLETE_GAP
+
+# معالجة إجابة المستخدم على "اكمل الفراغ"
+async def handle_gap_answer(update: Update, context: CallbackContext):
+    user_id = update.message.from_user.id
+    user_answer = update.message.text.strip()
+    gap_sentence = context.user_data.get("current_gap")
+
+    if gap_sentence and user_answer.lower() == gap_sentence["answer"].lower():
+        # إضافة نقاط للمستخدم
+        if "points" not in user_data[user_id]:
+            user_data[user_id]["points"] = 0
+        user_data[user_id]["points"] += 10
+        await update.message.reply_text(f"✅ إجابة صحيحة! نقاطك الآن: {user_data[user_id]['points']}")
+    else:
+        await update.message.reply_text("❌ إجابة خاطئة، حاول مرة أخرى!")
+
+    return MAIN_MENU
+
+# الرجوع للقائمة الرئيسية
+async def main_menu(update: Update, context: CallbackContext):
+    await update.callback_query.answer()
+    keyboard = [
+        [InlineKeyboardButton("🌙 فوائد متنوعة", callback_data="daily_faidah")],
+        [InlineKeyboardButton("🕌 اشترك في برنامج حفظ الكلمات العلية", callback_data="memorize_words")],
+        [InlineKeyboardButton("📝 اختبار حفظك (اكمل الفراغ)", callback_data="complete_gap")],
+    ]
+    reply_markup = InlineKeyboardMarkup(keyboard)
+    await update.callback_query.edit_message_text(
+        "🌙 *اختر من القائمة* 🌙",
+        reply_markup=reply_markup,
+        parse_mode="Markdown",
+    )
+    return MAIN_MENU
+
+# إعداد البوت وتشغيله
+def main():
+    # استخدام ApplicationBuilder لإنشاء Application مع JobQueue
+    app = ApplicationBuilder().token(TOKEN).build()
+
+    conv_handler = ConversationHandler(
+        entry_points=[CommandHandler("start", start)],
+        states={
+            MAIN_MENU: [
+                CallbackQueryHandler(daily_faidah, pattern="^daily_faidah$"),
+                CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
+                CallbackQueryHandler(complete_gap, pattern="^complete_gap$"),
+                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
+            ],
+            WORD_COUNT: [
+                CallbackQueryHandler(word_count, pattern="^one_word$"),
+                CallbackQueryHandler(word_count, pattern="^two_words$"),
+            ],
+            REVIEW_WORDS: [
+                CallbackQueryHandler(review_words, pattern="^review_words$"),
+            ],
+            COMPLETE_GAP: [
+                MessageHandler(filters.TEXT & ~filters.COMMAND, handle_gap_answer),
+            ],
+        },
+        fallbacks=[CommandHandler("start", start)],
+    )
+
+    app.add_handler(conv_handler)
+    app.run_polling()
+
+if __name__ == "__main__":
+    main()
