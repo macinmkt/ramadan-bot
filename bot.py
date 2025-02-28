@@ -146,12 +146,14 @@ async def select_period(update: Update, context: CallbackContext):
         context.user_data["test_key"] = "last_ten"
 
     keyboard = [
-        [InlineKeyboardButton(f"اليوم {i+1}", callback_data=f"day_{i}") for i in range(5)],
-        [InlineKeyboardButton(f"اليوم {i+6}", callback_data=f"day_{i+5}") for i in range(5)],
+        [InlineKeyboardButton(f"اليوم {i+1}{' ✅' if context.user_data['current_words'][i] in user_data[user_id]['memorized_words'] else ''}", callback_data=f"day_{i}") for i in range(5)],
+        [InlineKeyboardButton(f"اليوم {i+6}{' ✅' if context.user_data['current_words'][i+5] in user_data[user_id]['memorized_words'] else ''}", callback_data=f"day_{i+5}") for i in range(5)],
     ]
-    if period == "last_ten" and len(user_data[user_id]["memorized_words"]) >= 30:
-        keyboard.append([InlineKeyboardButton("📝 اختبار العشر الأواخر", callback_data="test_period")])
-        keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
+    # إذا تم حفظ اليوم العاشر، أضف زر الاختبار
+    if context.user_data["current_words"][-1] in user_data[user_id]["memorized_words"]:
+        keyboard.append([InlineKeyboardButton(f"📝 اختبار {period.replace('_', ' ')}", callback_data="test_period")])
+        if period == "last_ten" and len(user_data[user_id]["memorized_words"]) >= 30:
+            keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_periods")])
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -162,7 +164,7 @@ async def select_period(update: Update, context: CallbackContext):
     )
     return DAY_SELECTION
 
-# عرض الكلمة للحفظ
+# عرض الكلمة للحفظ أو المراجعة
 async def select_day(update: Update, context: CallbackContext):
     await update.callback_query.answer()
     user_id = update.callback_query.from_user.id
@@ -170,11 +172,18 @@ async def select_day(update: Update, context: CallbackContext):
     words = context.user_data["current_words"]
     word = words[day_index]
 
-    keyboard = [
-        [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"memorize_{day_index}")],
-        [InlineKeyboardButton("🔙 رجوع للخلف", callback_data="back_to_days")],
-        [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")],
-    ]
+    # التحقق مما إذا تم حفظ الكلمة مسبقًا
+    if word in user_data[user_id]["memorized_words"]:
+        keyboard = [
+            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
+        ]
+    else:
+        keyboard = [
+            [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"memorize_{day_index}")],
+            [InlineKeyboardButton("🔙 رجوع للخلف", callback_data="back_to_days")],
+            [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")],
+        ]
+    
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
         f"📜 *اليوم {day_index + 1}*\n\n{word}",
@@ -203,7 +212,7 @@ async def memorize_word(update: Update, context: CallbackContext):
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
-    return DAY_SELECTION
+    return DAY_SELECTION  # الرجوع لقائمة الأيام
 
 # اختبار الفترة أو الشامل
 async def start_test(update: Update, context: CallbackContext):
@@ -268,6 +277,9 @@ async def back_to_periods(update: Update, context: CallbackContext):
 
 # الرجوع لاختيار اليوم
 async def back_to_days(update: Update, context: CallbackContext):
+    period = "first_ten" if context.user_data["current_words"] == WORDS_FIRST_TEN else \
+            "middle_ten" if context.user_data["current_words"] == WORDS_MIDDLE_TEN else "last_ten"
+    update.callback_query.data = period  # محاكاة اختيار الفترة
     await select_period(update, context)
     return DAY_SELECTION
 
