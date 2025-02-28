@@ -17,79 +17,23 @@ if not TOKEN:
     raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
 
 # حالات المحادثة
-MAIN_MENU, PERIOD_SELECTION, DAY_SELECTION, MEMORIZE, TEST = range(5)
+PERIOD_SELECTION, DAY_SELECTION, MEMORIZE, TEST = range(4)
 
 # قوائم الكلمات لكل فترة
 WORDS_FIRST_TEN = [
-    "الصبر مفتاح الفرج",           # اليوم 1
-    "الصوم جنة",                   # اليوم 2
-    "القرآن هدى",                  # اليوم 3
-    "الصدقة تطفئ الغضب",          # اليوم 4
-    "الصلاة نور",                  # اليوم 5
-    "الذكر راحة",                  # اليوم 6
-    "التوبة مغفرة",                # اليوم 7
-    "الدعاء عبادة",               # اليوم 8
-    "الإخلاص سر النجاح",          # اليوم 9
-    "رمضان فرصة",                 # اليوم 10
+    "الصبر مفتاح الفرج", "الصوم جنة", "القرآن هدى", "الصدقة تطفئ الغضب", "الصلاة نور",
+    "الذكر راحة", "التوبة مغفرة", "الدعاء عبادة", "الإخلاص سر النجاح", "رمضان فرصة",
 ]
 
 WORDS_MIDDLE_TEN = [
-    "التقوى زاد",                  # اليوم 11
-    "الصمت حكمة",                  # اليوم 12
-    "القلب مرآة",                  # اليوم 13
-    "الجار حق",                    # اليوم 14
-    "الأمل قوة",                   # اليوم 15
-    "الرضا كنز",                   # اليوم 16
-    "العمل صلاح",                 # اليوم 17
-    "الشكر نعمة",                  # اليوم 18
-    "العدل أساس",                 # اليوم 19
-    "التوكل يقين",                 # اليوم 20
+    "التقوى زاد", "الصمت حكمة", "القلب مرآة", "الجار حق", "الأمل قوة",
+    "الرضا كنز", "العمل صلاح", "الشكر نعمة", "العدل أساس", "التوكل يقين",
 ]
 
 WORDS_LAST_TEN = [
-    "ليلة القدر خير",              # اليوم 21
-    "العتق من النار",             # اليوم 22
-    "الاجتهاد فضيلة",             # اليوم 23
-    "التهجد قربة",                 # اليوم 24
-    "الاستغفار مفتاح",            # اليوم 25
-    "القيام بركة",                 # اليوم 26
-    "الإنفاق ثواب",               # اليوم 27
-    "الخشوع راحة",                # اليوم 28
-    "العيد فرحة",                  # اليوم 29
-    "رمضان وداع",                 # اليوم 30
+    "ليلة القدر خير", "العتق من النار", "الاجتهاد فضيلة", "التهجد قربة", "الاستغفار مفتاح",
+    "القيام بركة", "الإنفاق ثواب", "الخشوع راحة", "العيد فرحة", "رمضان وداع",
 ]
-
-# أسئلة الاختبار لكل فترة
-TEST_QUESTIONS = {
-    "first_ten": [
-        {"q": "ما هو مفتاح الفرج؟", "a": "الصبر"},
-        {"q": "ما الذي يطفئ الغضب؟", "a": "الصدقة"},
-        {"q": "ما هو نور المؤمن؟", "a": "الصلاة"},
-        {"q": "ما هو سر النجاح؟", "a": "الإخلاص"},
-        {"q": "ما هي فرصة رمضان؟", "a": "التوبة"},
-    ],
-    "middle_ten": [
-        {"q": "ما هو زاد المؤمن؟", "a": "التقوى"},
-        {"q": "ما هو كنز الدنيا؟", "a": "الرضا"},
-        {"q": "ما هو أساس العدل؟", "a": "العدل"},
-        {"q": "ما هي حكمة الصمت؟", "a": "الصمت"},
-        {"q": "ما هو حق الجار؟", "a": "الجار"},
-    ],
-    "last_ten": [
-        {"q": "ما هي خير من ألف شهر؟", "a": "ليلة القدر"},
-        {"q": "ما هو مفتاح الاستغفار؟", "a": "الاستغفار"},
-        {"q": "ما هي بركة القيام؟", "a": "القيام"},
-        {"q": "ما هو ثواب الإنفاق؟", "a": "الإنفاق"},
-        {"q": "ما هي فرحة العيد؟", "a": "العيد"},
-    ],
-    "all_days": [
-        {"q": "ما هو مفتاح الفرج؟", "a": "الصبر"},
-        {"q": "ما هي خير من ألف شهر؟", "a": "ليلة القدر"},
-        {"q": "ما هو زاد المؤمن؟", "a": "التقوى"},
-        {"q": "ما هو نور المؤمن؟", "a": "الصلاة"},
-        {"q": "ما هو كنز الدنيا؟", "a": "الرضا"},
-    ]
-}
 
 # حفظ بيانات المستخدم
 user_data = {}
@@ -100,33 +44,15 @@ async def start(update: Update, context: CallbackContext):
     if user_id not in user_data:
         user_data[user_id] = {"memorized_words": [], "points": 0}
 
-    welcome_message = (
-        "🌙 *رمضان كريم* 🌙\n\n"
-        "مرحبًا بك في بوت مسابقة حفظ الكلمات العلية! اختر من القائمة:"
-    )
+    welcome_message = "🌙 *مسابقة حفظ الكلمات العلية* 🌙\n\nاختر فترة من رمضان:"
 
-    keyboard = [
-        [InlineKeyboardButton("🕌 مسابقة حفظ الكلمات العلية", callback_data="memorize_words")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
-    return MAIN_MENU
-
-# اختيار الفترة
-async def memorize_words(update: Update, context: CallbackContext):
-    await update.callback_query.answer()
     keyboard = [
         [InlineKeyboardButton("العشر الأوائل من رمضان", callback_data="first_ten")],
         [InlineKeyboardButton("العشر الوسطى من رمضان", callback_data="middle_ten")],
         [InlineKeyboardButton("العشر الأواخر من رمضان", callback_data="last_ten")],
-        [InlineKeyboardButton("🔙 رجوع للقائمة الرئيسية", callback_data="main_menu")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(
-        "🌙 *اختر الفترة* 🌙",
-        reply_markup=reply_markup,
-        parse_mode="Markdown",
-    )
+    await update.message.reply_text(welcome_message, reply_markup=reply_markup, parse_mode="Markdown")
     return PERIOD_SELECTION
 
 # اختيار اليوم
@@ -137,25 +63,32 @@ async def select_period(update: Update, context: CallbackContext):
 
     if period == "first_ten":
         context.user_data["current_words"] = WORDS_FIRST_TEN
-        context.user_data["test_key"] = "first_ten"
     elif period == "middle_ten":
         context.user_data["current_words"] = WORDS_MIDDLE_TEN
-        context.user_data["test_key"] = "middle_ten"
     elif period == "last_ten":
         context.user_data["current_words"] = WORDS_LAST_TEN
-        context.user_data["test_key"] = "last_ten"
 
-    keyboard = [
-        [InlineKeyboardButton(f"اليوم {i+1}{' ✅' if context.user_data['current_words'][i] in user_data[user_id]['memorized_words'] else ''}", callback_data=f"day_{i}") for i in range(5)],
-        [InlineKeyboardButton(f"اليوم {i+6}{' ✅' if context.user_data['current_words'][i+5] in user_data[user_id]['memorized_words'] else ''}", callback_data=f"day_{i+5}") for i in range(5)],
-    ]
-    # إذا تم حفظ اليوم العاشر، أضف زر الاختبار
-    if context.user_data["current_words"][-1] in user_data[user_id]["memorized_words"]:
+    keyboard = []
+    words = context.user_data["current_words"]
+    for i in range(0, 10, 2):
+        row = [
+            InlineKeyboardButton(
+                f"اليوم {i+1}{' ✅' if words[i] in user_data[user_id]['memorized_words'] else ''}",
+                callback_data=f"day_{i}"
+            ),
+            InlineKeyboardButton(
+                f"اليوم {i+2}{' ✅' if words[i+1] in user_data[user_id]['memorized_words'] else ''}",
+                callback_data=f"day_{i+1}"
+            ) if i + 1 < len(words) else None
+        ]
+        keyboard.append([btn for btn in row if btn])
+
+    if words[-1] in user_data[user_id]["memorized_words"]:
         keyboard.append([InlineKeyboardButton(f"📝 اختبار {period.replace('_', ' ')}", callback_data="test_period")])
         if period == "last_ten" and len(user_data[user_id]["memorized_words"]) >= 30:
             keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
     keyboard.append([InlineKeyboardButton("🔙 رجوع", callback_data="back_to_periods")])
-    
+
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
         f"🌟 *اختر يومًا من {period.replace('_', ' ')}* 🌟",
@@ -172,16 +105,14 @@ async def select_day(update: Update, context: CallbackContext):
     words = context.user_data["current_words"]
     word = words[day_index]
 
-    # التحقق مما إذا تم حفظ الكلمة مسبقًا
     if word in user_data[user_id]["memorized_words"]:
         keyboard = [
-            [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
+            [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
         ]
     else:
         keyboard = [
             [InlineKeyboardButton("✅ تم الحفظ", callback_data=f"memorize_{day_index}")],
-            [InlineKeyboardButton("🔙 رجوع للخلف", callback_data="back_to_days")],
-            [InlineKeyboardButton("🏠 القائمة الرئيسية", callback_data="main_menu")],
+            [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
         ]
     
     reply_markup = InlineKeyboardMarkup(keyboard)
@@ -204,7 +135,7 @@ async def memorize_word(update: Update, context: CallbackContext):
         user_data[user_id]["points"] += 10
 
     keyboard = [
-        [InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")],
+        [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
     ]
     reply_markup = InlineKeyboardMarkup(keyboard)
     await update.callback_query.edit_message_text(
@@ -212,7 +143,7 @@ async def memorize_word(update: Update, context: CallbackContext):
         reply_markup=reply_markup,
         parse_mode="Markdown",
     )
-    return DAY_SELECTION  # الرجوع لقائمة الأيام
+    return DAY_SELECTION
 
 # اختبار الفترة أو الشامل
 async def start_test(update: Update, context: CallbackContext):
@@ -221,65 +152,80 @@ async def start_test(update: Update, context: CallbackContext):
     test_type = update.callback_query.data
 
     if test_type == "test_period":
-        questions = TEST_QUESTIONS[context.user_data["test_key"]]
+        words = context.user_data["current_words"]
     elif test_type == "test_all":
-        questions = TEST_QUESTIONS["all_days"]
+        words = WORDS_FIRST_TEN + WORDS_MIDDLE_TEN + WORDS_LAST_TEN
 
-    question = random.choice(questions)
-    context.user_data["current_question"] = question
+    context.user_data["test_words"] = words.copy()
+    context.user_data["current_score"] = 0
+    context.user_data["current_question_index"] = 0
 
-    await update.callback_query.edit_message_text(
-        f"📝 *سؤال الاختبار* 📝\n\n{question['q']}",
-    )
+    await ask_next_question(update, context)
     return TEST
 
-# معالجة إجابة الاختبار
+async def ask_next_question(update: Update, context: CallbackContext):
+    words = context.user_data["test_words"]
+    index = context.user_data["current_question_index"]
+
+    if index >= 5:  # حد 5 أسئلة
+        score = context.user_data["current_score"]
+        keyboard = [[InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")]]
+        await (update.callback_query.edit_message_text if update.callback_query else update.message.reply_text)(
+            f"🏆 *انتهى الاختبار!* درجاتك: {score}/5",
+            reply_markup=InlineKeyboardMarkup(keyboard),
+            parse_mode="Markdown",
+        )
+        return DAY_SELECTION
+
+    word_phrase = random.choice(words)
+    word_parts = word_phrase.split()
+    blank_pos = random.randint(0, len(word_parts) - 1)
+    correct_answer = word_parts[blank_pos]
+    word_parts[blank_pos] = "______"
+    question = " ".join(word_parts)
+
+    context.user_data["current_question"] = {"q": question, "a": correct_answer}
+    await (update.callback_query.edit_message_text if update.callback_query else update.message.reply_text)(
+        f"📝 *املأ الفراغ ({index + 1}/5)*:\n\n{question}",
+        parse_mode="Markdown",
+    )
+    context.user_data["current_question_index"] += 1
+
 async def handle_test_answer(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
     user_answer = update.message.text.strip()
     question = context.user_data["current_question"]
 
-    keyboard = [[InlineKeyboardButton("🔙 رجوع", callback_data="back_to_days")]]
+    keyboard = [
+        [InlineKeyboardButton("➡️ استمرار", callback_data="continue_test")],
+        [InlineKeyboardButton("🔙 رجوع للأيام", callback_data="back_to_days")],
+    ]
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if user_answer.lower() == question["a"].lower():
-        await update.message.reply_text(
-            "✅ *إجابة صحيحة!*",
-            reply_markup=reply_markup,
-            parse_mode="Markdown",
-        )
+        context.user_data["current_score"] += 1
+        result = "✅ *إجابة صحيحة!*"
     else:
-        await update.message.reply_text(
-            "❌ *إجابة خاطئة!*",
-            reply_markup=reply_markup,
-            parse_mode="Markdown",
-        )
-    return DAY_SELECTION
+        result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {question['a']}"
 
-# الرجوع للقائمة الرئيسية
-async def main_menu(update: Update, context: CallbackContext):
+    await update.message.reply_text(result, reply_markup=reply_markup, parse_mode="Markdown")
+    return TEST
+
+async def continue_test(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    keyboard = [
-        [InlineKeyboardButton("🕌 مسابقة حفظ الكلمات العلية", callback_data="memorize_words")],
-    ]
-    reply_markup = InlineKeyboardMarkup(keyboard)
-    await update.callback_query.edit_message_text(
-        "🌙 *اختر من القائمة* 🌙",
-        reply_markup=reply_markup,
-        parse_mode="Markdown",
-    )
-    return MAIN_MENU
+    await ask_next_question(update, context)
+    return TEST
 
 # الرجوع لاختيار الفترة
 async def back_to_periods(update: Update, context: CallbackContext):
-    await memorize_words(update, context)
+    await start(update, context)
     return PERIOD_SELECTION
 
 # الرجوع لاختيار اليوم
 async def back_to_days(update: Update, context: CallbackContext):
     period = "first_ten" if context.user_data["current_words"] == WORDS_FIRST_TEN else \
             "middle_ten" if context.user_data["current_words"] == WORDS_MIDDLE_TEN else "last_ten"
-    update.callback_query.data = period  # محاكاة اختيار الفترة
+    update.callback_query.data = period
     await select_period(update, context)
     return DAY_SELECTION
 
@@ -290,13 +236,8 @@ def main():
     conv_handler = ConversationHandler(
         entry_points=[CommandHandler("start", start)],
         states={
-            MAIN_MENU: [
-                CallbackQueryHandler(memorize_words, pattern="^memorize_words$"),
-                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
-            ],
             PERIOD_SELECTION: [
                 CallbackQueryHandler(select_period, pattern="^(first_ten|middle_ten|last_ten)$"),
-                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
             DAY_SELECTION: [
                 CallbackQueryHandler(select_day, pattern="^day_"),
@@ -306,10 +247,11 @@ def main():
             MEMORIZE: [
                 CallbackQueryHandler(memorize_word, pattern="^memorize_"),
                 CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
-                CallbackQueryHandler(main_menu, pattern="^main_menu$"),
             ],
             TEST: [
                 MessageHandler(filters.TEXT & ~filters.COMMAND, handle_test_answer),
+                CallbackQueryHandler(continue_test, pattern="^continue_test$"),
+                CallbackQueryHandler(back_to_days, pattern="^back_to_days$"),
             ],
         },
         fallbacks=[CommandHandler("start", start)],
