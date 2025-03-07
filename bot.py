@@ -1,5 +1,7 @@
 import os
 import random
+import re
+import json
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -11,10 +13,23 @@ from telegram.ext import (
     filters,
 )
 
-# جلب توكن البوت من المتغيرات البيئية
-TOKEN = os.getenv("TOKEN")
-if not TOKEN:
-    raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
+# ملف تخزين بيانات المستخدمين
+DATA_FILE = "user_data.json"
+
+# دوال التحميل والحفظ لبيانات المستخدمين
+def load_user_data():
+    try:
+        with open(DATA_FILE, "r", encoding="utf-8") as f:
+            return json.load(f)
+    except Exception:
+        return {}
+
+def save_user_data(data):
+    with open(DATA_FILE, "w", encoding="utf-8") as f:
+        json.dump(data, f, ensure_ascii=False, indent=4)
+
+# تحميل بيانات المستخدمين عند بدء التشغيل
+user_data = load_user_data()
 
 # حالات المحادثة
 DAY_SELECTION, MEMORIZE, TEST = range(3)
@@ -50,7 +65,7 @@ WORDS = [
     "ربَّنا هَب لنا مِن لَدُنْك عَفوا، وهَيِّئ لنا مِن أَمْرنا رَشَدًا",  # اليوم 27
     "الفـائـدةُ التَّـامَّـة من لـيلة القَــدْر معْـقُـودَةٌ بحـفْـظ حُـقـوق اللَّـيالي العَشر!",  # اليوم 28
     "يَرْتَحِلُ رَمَضَانُ بالصَّالحِيْنَ فخُوْرٌ، وفِي الْمُقَصِّرِيْنَ مَقْهُوْرٌ، وَعَلَى الغَافِلِيْنَ شَاهِدٌ وَقُوْرٌ",  # اليوم 29
-    "رَبَّنَا أَرْسِلْ لَنَا مِنْ لَدُنْكَ سَعْدًا، وَاحْفَظْ لَنَا فِيْ شُؤُوْنِنَا رُشْدًا",  # اليوم 30
+    "رَبَّنَا أَرْسِلْ لَنَا مِنْ لَدُنْك سَعْدًا، وَاحْفَظْ لَنَا فِيْ شُؤُوْنِنَا رُشْدًا",  # اليوم 30
 ]
 
 # الكلمات المستخدمة مباشرة كاملة
@@ -67,22 +82,24 @@ def remove_tashkeel(text):
         text = text.replace(mark, '')
     return text
 
-# حفظ بيانات المستخدم
-user_data = {}
+# دالة لإزالة علامات الترقيم من النصوص
+def remove_punctuation(text):
+    return re.sub(r'[^\w\s]', '', text)
 
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+    user_id = str(update.message.from_user.id)
     if user_id not in user_data:
         user_data[user_id] = {"memorized_words": []}
-
+        save_user_data(user_data)
+        
     context.user_data.clear()
     context.user_data["current_words"] = FULL_WORDS
     await show_days(update, context)
     return DAY_SELECTION
 
 async def show_days(update: Update, context: CallbackContext):
-    user_id = update.callback_query.from_user.id if update.callback_query else update.message.from_user.id
+    user_id = str(update.callback_query.from_user.id) if update.callback_query else str(update.message.from_user.id)
     words = context.user_data["current_words"]
 
     keyboard = []
@@ -108,7 +125,7 @@ async def show_days(update: Update, context: CallbackContext):
         keyboard.append([InlineKeyboardButton("📚 اختبار شامل", callback_data="test_all")])
 
     reply_markup = InlineKeyboardMarkup(keyboard)
-    message = (
+    message_text = (
         "🌙 *رحلة حفظ الكلمات العلية في شهر رمضان المبارك* 🌙\n\n"
         "✨ انطلق في مغامرة يومية مع كلمات الحكمة والمعرفة في شهر الخير\n"
         "📅 اختر اليوم واحفظ الكلمة ثم اضغط *تم الحفظ* 🌟\n"
@@ -116,15 +133,21 @@ async def show_days(update: Update, context: CallbackContext):
         "📝 أو تحدَّ نفسك باختبار شامل من خلال زر *اختبار شامل* 🏆"
     )
     if update.callback_query:
-        await update.callback_query.edit_message_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+        try:
+            await update.callback_query.edit_message_text(message_text, reply_markup=reply_markup, parse_mode="Markdown")
+        except Exception as e:
+            if "Message is not modified" in str(e):
+                pass
+            else:
+                raise e
     else:
-        await update.message.reply_text(message, reply_markup=reply_markup, parse_mode="Markdown")
+        await update.message.reply_text(message_text, reply_markup=reply_markup, parse_mode="Markdown")
     return DAY_SELECTION
 
 # عرض الكلمة للحفظ أو المراجعة
 async def select_day(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
+    user_id = str(update.callback_query.from_user.id)
     day_index = int(update.callback_query.data.split("_")[1])
     words = context.user_data["current_words"]
     word = words[day_index]
@@ -150,13 +173,14 @@ async def select_day(update: Update, context: CallbackContext):
 # معالجة الحفظ
 async def memorize_word(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
+    user_id = str(update.callback_query.from_user.id)
     day_index = int(update.callback_query.data.split("_")[1])
     word = context.user_data["current_words"][day_index]
 
     if word not in user_data[user_id]["memorized_words"]:
         user_data[user_id]["memorized_words"].append(word)
-
+        save_user_data(user_data)
+        
     await update.callback_query.edit_message_text("✅ *تم الحفظ بنجاح!*", parse_mode="Markdown")
     await show_days(update, context)
     return DAY_SELECTION
@@ -164,7 +188,7 @@ async def memorize_word(update: Update, context: CallbackContext):
 # مراجعة الكلمات المحفوظة
 async def review(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
+    user_id = str(update.callback_query.from_user.id)
     memorized = user_data[user_id]["memorized_words"]
 
     if not memorized:
@@ -186,7 +210,7 @@ async def review(update: Update, context: CallbackContext):
 # اختبار شامل
 async def start_test(update: Update, context: CallbackContext):
     await update.callback_query.answer()
-    user_id = update.callback_query.from_user.id
+    user_id = str(update.callback_query.from_user.id)
     memorized = user_data[user_id]["memorized_words"]
 
     if not memorized:
@@ -209,14 +233,20 @@ async def ask_next_question(update: Update, context: CallbackContext):
     while words and len(words) > 1 and last_question and last_question["q"].split(" ")[0] in word_phrase:
         word_phrase = random.choice(words)
 
-    word_parts = word_phrase.split()
+    # إزالة علامات الترقيم من العبارة قبل توليد السؤال
+    word_phrase_clean = remove_punctuation(word_phrase)
+
+    word_parts = word_phrase_clean.split()
     if len(word_parts) < 2:
-        question = word_phrase
-        correct_answer = word_phrase
+        question = word_phrase_clean
+        correct_answer = word_phrase_clean
     else:
         blank_pos = random.randint(0, len(word_parts) - 1)
         if last_question and len(words) >= 1:
-            last_blank_pos = last_question["q"].split().index("ـــــــ")
+            try:
+                last_blank_pos = last_question["q"].split().index("ـــــــ")
+            except ValueError:
+                last_blank_pos = -1
             while blank_pos == last_blank_pos and len(word_parts) > 1:
                 blank_pos = random.randint(0, len(word_parts) - 1)
 
@@ -227,19 +257,25 @@ async def ask_next_question(update: Update, context: CallbackContext):
     context.user_data["current_question"] = {"q": question, "a": correct_answer}
     context.user_data["last_question"] = {"q": question, "a": correct_answer}
 
-    await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
-        f"📝 *املأ الفراغ:*\n\n{question}",
-        parse_mode="Markdown",
-    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            f"📝 *املأ الفراغ:*\n\n{question}",
+            parse_mode="Markdown",
+        )
+    else:
+        await update.message.reply_text(
+            f"📝 *املأ الفراغ:*\n\n{question}",
+            parse_mode="Markdown",
+        )
 
 async def handle_test_answer(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
+    user_id = str(update.message.from_user.id)
     user_answer = update.message.text.strip()
     question = context.user_data["current_question"]
 
-    # إزالة التشكيل من الإجابة المُدخلة والإجابة الصحيحة
-    user_answer_clean = remove_tashkeel(user_answer).lower()
-    correct_answer_clean = remove_tashkeel(question["a"]).lower()
+    # إزالة التشكيل وعلامات الترقيم من الإجابة المُدخلة والإجابة الصحيحة
+    user_answer_clean = remove_tashkeel(remove_punctuation(user_answer)).lower()
+    correct_answer_clean = remove_tashkeel(remove_punctuation(question["a"])).lower()
 
     keyboard = [
         [InlineKeyboardButton("➡️ سؤال آخر", callback_data="next_question")],
