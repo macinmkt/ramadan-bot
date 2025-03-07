@@ -12,6 +12,9 @@ from telegram.ext import (
     filters,
 )
 
+# تعريف المتغير العالمي لتخزين بيانات المستخدمين
+user_data = {}
+
 # دالة لإزالة علامات الترقيم من النصوص
 def remove_punctuation(text):
     return re.sub(r'[^\w\s]', '', text)
