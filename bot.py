@@ -1,5 +1,6 @@
 import os
 import random
+import re
 from telegram import Update, InlineKeyboardButton, InlineKeyboardMarkup
 from telegram.ext import (
     ApplicationBuilder,
@@ -10,6 +11,25 @@ from telegram.ext import (
     MessageHandler,
     filters,
 )
+
+# دالة لإزالة علامات الترقيم من النصوص
+def remove_punctuation(text):
+    return re.sub(r'[^\w\s]', '', text)
+
+# دالة لإزالة التشكيل من النصوص
+def remove_tashkeel(text):
+    tashkeel = (
+        '\u064B', '\u064C', '\u064D', '\u064E', '\u064F', '\u0650', '\u0651', '\u0652',
+        '\u0653', '\u0654', '\u0655', '\u0656', '\u0657', '\u0658', '\u0659', '\u065A',
+        '\u065B', '\u065C', '\u065D', '\u065E', '\u065F', '\u0670'
+    )
+    for mark in tashkeel:
+        text = text.replace(mark, '')
+    return text
+
+# دالة لتنظيف الإجابة: إزالة التشكيل، علامات الترقيم والمسافات، وتحويل النص للحروف الصغيرة
+def clean_answer(text):
+    return remove_tashkeel(remove_punctuation(text)).replace(" ", "").lower()
 
 # جلب توكن البوت من المتغيرات البيئية
 TOKEN = os.getenv("TOKEN")
@@ -47,7 +67,7 @@ WORDS = [
     "الدَّناءة: آثار أَرْضَيَّة تُصِيْب النُّفُوْسَ باقتراف الأسْباب الدُّنْيَوِيَّة، وآثار عُدْوانِيَّة تُصِيبها بانتهاك الحُرُمات الشَّرعِية",  # اليوم 24
     "فَضْلُ لَيْلة القَدْر: بقَدْرها المُبْرَم، ومِيْقاتها المُحْكَم، وحَدَثِها المُعظَّم! أَجْرُ مُوافِقِها مُضَخَّم، والمُعْرِض عنها مُعْدَم",  # اليوم 25
     "لَيْلَةُ الْقَدْرِ نِعْمَةٌ لَا تَنْحَصِرُ بالمُكاشَفِيْن؛ فَخَيْرُهَا يُصِيْبُ كَافَّةَ المُحْيِيْنَ",  # اليوم 26
-    "ربَّنا هَب لنا مِن لَدُنْك عَفوا، وهَيِّئ لنا مِن أَمْرنا رَشَدًا",  # اليوم 27
+    "ربَّنا هَبْ لَنَا مِنْ لَدُنْكَ عَفْوًا، وَهَيِّئْ لَنَا مِنْ أَمْرِنَا رَشَدًا",  # اليوم 27
     "الفـائـدةُ التَّـامَّـة من لـيلة القَــدْر معْـقُـودَةٌ بحـفْـظ حُـقـوق اللَّـيالي العَشر!",  # اليوم 28
     "يَرْتَحِلُ رَمَضَانُ بالصَّالحِيْنَ فخُوْرٌ، وفِي الْمُقَصِّرِيْنَ مَقْهُوْرٌ، وَعَلَى الغَافِلِيْنَ شَاهِدٌ وَقُوْرٌ",  # اليوم 29
     "رَبَّنَا أَرْسِلْ لَنَا مِنْ لَدُنْكَ سَعْدًا، وَاحْفَظْ لَنَا فِيْ شُؤُوْنِنَا رُشْدًا",  # اليوم 30
@@ -55,20 +75,6 @@ WORDS = [
 
 # الكلمات المستخدمة مباشرة كاملة
 FULL_WORDS = WORDS
-
-# دالة لإزالة التشكيل من النصوص
-def remove_tashkeel(text):
-    tashkeel = (
-        '\u064B', '\u064C', '\u064D', '\u064E', '\u064F', '\u0650', '\u0651', '\u0652',
-        '\u0653', '\u0654', '\u0655', '\u0656', '\u0657', '\u0658', '\u0659', '\u065A',
-        '\u065B', '\u065C', '\u065D', '\u065E', '\u065F', '\u0670'
-    )
-    for mark in tashkeel:
-        text = text.replace(mark, '')
-    return text
-
-# حفظ بيانات المستخدم
-user_data = {}
 
 # القائمة الرئيسية
 async def start(update: Update, context: CallbackContext):
@@ -209,37 +215,47 @@ async def ask_next_question(update: Update, context: CallbackContext):
     while words and len(words) > 1 and last_question and last_question["q"].split(" ")[0] in word_phrase:
         word_phrase = random.choice(words)
 
+    # نقسم العبارة لاستخلاص الكلمة التي سيتم حذفها منها
     word_parts = word_phrase.split()
     if len(word_parts) < 2:
         question = word_phrase
-        correct_answer = word_phrase
+        raw_answer = word_phrase
     else:
         blank_pos = random.randint(0, len(word_parts) - 1)
         if last_question and len(words) >= 1:
-            last_blank_pos = last_question["q"].split().index("ـــــــ")
+            try:
+                last_blank_pos = last_question["q"].split().index("ـــــــ")
+            except ValueError:
+                last_blank_pos = -1
             while blank_pos == last_blank_pos and len(word_parts) > 1:
                 blank_pos = random.randint(0, len(word_parts) - 1)
-
-        correct_answer = word_parts[blank_pos]
+        raw_answer = word_parts[blank_pos]
         word_parts[blank_pos] = "ـــــــ"
         question = " ".join(word_parts)
 
-    context.user_data["current_question"] = {"q": question, "a": correct_answer}
-    context.user_data["last_question"] = {"q": question, "a": correct_answer}
+    # تنظيف الإجابة لتكون بدون تشكيل، علامات ترقيم ومسافات
+    cleaned_answer = clean_answer(raw_answer)
+    context.user_data["current_question"] = {"q": question, "a": cleaned_answer}
+    context.user_data["last_question"] = {"q": question, "a": cleaned_answer}
 
-    await (update.callback_query.edit_message_text if hasattr(update, 'callback_query') and update.callback_query else update.message.reply_text)(
-        f"📝 *املأ الفراغ:*\n\n{question}",
-        parse_mode="Markdown",
-    )
+    if update.callback_query:
+        await update.callback_query.edit_message_text(
+            f"📝 *املأ الفراغ:*\n\n{question}",
+            parse_mode="Markdown",
+        )
+    else:
+        await update.message.reply_text(
+            f"📝 *املأ الفراغ:*\n\n{question}",
+            parse_mode="Markdown",
+        )
 
 async def handle_test_answer(update: Update, context: CallbackContext):
-    user_id = update.message.from_user.id
     user_answer = update.message.text.strip()
     question = context.user_data["current_question"]
 
-    # إزالة التشكيل من الإجابة المُدخلة والإجابة الصحيحة
-    user_answer_clean = remove_tashkeel(user_answer).lower()
-    correct_answer_clean = remove_tashkeel(question["a"]).lower()
+    # مقارنة الإجابة بعد تنظيفها من التشكيل، علامات الترقيم والمسافات
+    user_answer_clean = clean_answer(user_answer)
+    correct_answer_clean = question["a"]
 
     keyboard = [
         [InlineKeyboardButton("➡️ سؤال آخر", callback_data="next_question")],
@@ -248,9 +264,9 @@ async def handle_test_answer(update: Update, context: CallbackContext):
     reply_markup = InlineKeyboardMarkup(keyboard)
 
     if user_answer_clean == correct_answer_clean:
-        result = "✅ *إجابة صحيحة!*\n\n" + f"الإجابة: {question['a']}"
+        result = "✅ *إجابة صحيحة!*\n\n" + f"الإجابة: {correct_answer_clean}"
     else:
-        result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {question['a']}"
+        result = f"❌ *إجابة خاطئة!* الإجابة الصحيحة: {correct_answer_clean}"
 
     await update.message.reply_text(result, reply_markup=reply_markup, parse_mode="Markdown")
     return TEST
