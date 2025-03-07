@@ -11,25 +11,7 @@ from telegram.ext import (
     filters,
 )
 
-# جلب توكن البوت من المتغيرات البيئية
-TOKEN = os.getenv("TOKEN")
-if not TOKEN:
-    raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
-
-# حالات المحادثة
-DAY_SELECTION, MEMORIZE, TEST = range(3)
-
-# قائمة الكلمات لـ 30 يومًا
-WORDS = [
-    "رمضانُ شهٌر مليٌء بالإحسان!",  # اليوم 1
-    "راء رَمَضَان: رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ، وَالضَّادُ: ضَمَانُهُ لِجَزَاءِ الصَّائِمِينَ، وَالأَلْفُ: إِحْسَانُهُ للطَائِعين، والنونُ: نُورُه لِلمُحْسِنِينَ",  # اليوم 2
-    # ... (باقى الكلمات كما هى)
-]
-
-# الكلمات الكاملة بدون تشكيل للمراجعة
-FULL_WORDS = [remove_tashkeel(word) for word in WORDS]
-
-# دالة لإزالة التشكيل من النصوص
+# دالة إزالة التشكيل (مُعرَّفة قبل الاستخدام)
 def remove_tashkeel(text):
     tashkeel = (
         '\u064B', '\u064C', '\u064D', '\u064E', '\u064F', '\u0650', '\u0651', '\u0652',
@@ -38,16 +20,32 @@ def remove_tashkeel(text):
     )
     return text.translate(str.maketrans('', '', ''.join(tashkeel)))
 
+# جلب توكن البوت من المتغيرات البيئية
+TOKEN = os.getenv("TOKEN")
+if not TOKEN:
+    raise ValueError("No TOKEN provided. Please set the TOKEN environment variable.")
+
+# حالات المحادثة
+DAY_SELECTION, MEMORIZE, TEST = range(3)
+
+# قائمة الكلمات لـ 30 يومًا (بالتشكيل)
+WORDS = [
+    "رمضانُ شهٌر مليٌء بالإحسان!",  # اليوم 1
+    "راء رَمَضَان: رَحْمَةُ الله للصَّائِمِين، وَالمِيمُ: مَغْفِرَتُهُ لِلمُؤَمِّنِينَ، وَالضَّادُ: ضَمَانُهُ لِجَزَاءِ الصَّائِمِينَ، وَالأَلْفُ: إِحْسَانُهُ للطَائِعين، والنونُ: نُورُه لِالمُحْسِنِينَ",  # اليوم 2
+    # ... (باقي الكلمات كما هي حتى اليوم 30)
+]
+
+# إنشاء قائمة بالكلمات بدون تشكيل
+FULL_WORDS = [remove_tashkeel(word) for word in WORDS]
+
 # حفظ بيانات المستخدم
 user_data = {}
 
-# القائمة الرئيسية
+# نقطة البداية
 async def start(update: Update, context: CallbackContext):
     user_id = update.message.from_user.id
-    if user_id not in user_data:
-        user_data[user_id] = {"memorized_words": []}
-
-    context.user_data["current_words"] = WORDS
+    user_data.setdefault(user_id, {"memorized_words": []})
+    context.user_data["current_words"] = FULL_WORDS
     await show_days(update, context)
     return DAY_SELECTION
 
@@ -56,7 +54,6 @@ async def show_days(update: Update, context: CallbackContext):
     user_id = query.from_user.id if query else update.message.from_user.id
     words = context.user_data["current_words"]
 
-    # إنشاء لوحة المفاتيح مع التحقق من الحالة
     keyboard = []
     for i in range(0, 30, 3):
         row = []
@@ -65,7 +62,6 @@ async def show_days(update: Update, context: CallbackContext):
             row.append(InlineKeyboardButton(f"اليوم {j+1}{status}", callback_data=f"day_{j}"))
         keyboard.append(row)
 
-    # إضافة أزرار المراجعة والاختبار إذا لزم الأمر
     if user_data[user_id]["memorized_words"]:
         keyboard.extend([
             [InlineKeyboardButton("📖 مراجعة", callback_data="review")],
@@ -80,29 +76,10 @@ async def show_days(update: Update, context: CallbackContext):
         "📝 أو تحدَّ نفسك باختبار شامل من خلال زر *اختبار شامل* 🏆"
     )
 
-    try:
-        if query:
-            # التحقق من أن المحتوى تغير قبل التعديل
-            current_text = query.message.text
-            current_markup = query.message.reply_markup
-            new_markup = InlineKeyboardMarkup(keyboard)
-            
-            if current_text != message or str(current_markup) != str(new_markup):
-                await query.edit_message_text(
-                    message,
-                    reply_markup=InlineKeyboardMarkup(keyboard),
-                    parse_mode="Markdown"
-                )
-        else:
-            await update.message.reply_text(
-                message,
-                reply_markup=InlineKeyboardMarkup(keyboard),
-                parse_mode="Markdown"
-            )
-    except Exception as e:
-        if "Message is not modified" not in str(e):
-            raise e
-
+    if query:
+        await query.edit_message_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
+    else:
+        await update.message.reply_text(message, reply_markup=InlineKeyboardMarkup(keyboard), parse_mode="Markdown")
     return DAY_SELECTION
 
 # معالجة اختيار اليوم
@@ -185,6 +162,8 @@ async def start_test(update: Update, context: CallbackContext):
 
 async def ask_next_question(update: Update, context: CallbackContext):
     words = context.user_data["test_words"]
+    last_question = context.user_data.get("last_question")
+
     word_phrase = random.choice(words)
     word_parts = word_phrase.split()
 
