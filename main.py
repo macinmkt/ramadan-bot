@@ -62,7 +62,7 @@ logging.basicConfig(
 logger = logging.getLogger(__name__)
 
 # ─── جلب التوكن ───
-TOKEN = os.getenv("TOKEN")
+TOKEN = os.getenv("8033500874:AAH-VyvwBJvr2FzXcCaHHS67QbDS9ONn2kM")
 if not TOKEN:
     raise ValueError("لم يتم تعيين TOKEN. يرجى تعيين متغير البيئة TOKEN.")
 
